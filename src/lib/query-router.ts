@@ -571,8 +571,9 @@ export function routeQuery(query: string): RouteResult {
         const params = pattern.extract(q, match)
 
         // _skip 플래그: 이 패턴은 매칭되었으나 의도가 다름 → 다음 패턴으로 진행
+        // break로 inner loop(regex 목록) 전체를 빠져나가야 outer loop(패턴 목록)이 다음으로 진행
         if (params._skip) {
-          continue
+          break
         }
 
         // _fallback 플래그: 법령명 없이 키워드만 → 종합 리서치
