@@ -6,6 +6,7 @@
 import { z } from "zod"
 import type { LawApiClient } from "../lib/api-client.js"
 import { searchPrecedents } from "./precedents.js"
+import { truncateResponse } from "../lib/schemas.js"
 
 export const FindSimilarPrecedentsSchema = z.object({
   query: z.string().describe("검색 키워드 또는 판례 내용"),
@@ -57,7 +58,7 @@ export async function findSimilarPrecedents(
     return {
       content: [{
         type: "text",
-        text: rankedResults
+        text: truncateResponse(rankedResults)
       }]
     }
   } catch (error) {
@@ -101,6 +102,11 @@ function extractQueryKeywords(query: string): string[] {
 /**
  * 키워드 유사도 기반 순위 매기기
  */
+/** 정규식 메타문자 이스케이프 */
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
 function rankByKeywordSimilarity(searchResultText: string, keywords: string[], maxResults: number): string {
   const lines = searchResultText.split('\n')
 
@@ -110,50 +116,46 @@ function rankByKeywordSimilarity(searchResultText: string, keywords: string[], m
   let currentScore = 0
 
   for (const line of lines) {
-    if (line.match(/^\d+\.\s/)) {  // 새로운 판례 시작
+    // searchPrecedents 출력 형식: "[일련번호] 판례명" 또는 "N. " 형식
+    if (line.match(/^\[\d+\]\s/) || line.match(/^\d+\.\s/)) {
       if (currentPrecedent) {
         precedents.push({ text: currentPrecedent, score: currentScore })
       }
       currentPrecedent = line
       currentScore = 0
 
-      // 키워드 매칭 점수 계산
+      // 키워드 매칭 점수 (이스케이프하여 regex injection 방지)
       for (const keyword of keywords) {
-        const regex = new RegExp(keyword, 'g')
-        const matches = line.match(regex)
+        const safeKeyword = escapeRegex(keyword)
+        const matches = line.match(new RegExp(safeKeyword, 'gi'))
         if (matches) {
           currentScore += matches.length
         }
       }
-    } else {
+    } else if (currentPrecedent) {
       currentPrecedent += "\n" + line
 
-      // 키워드 매칭 점수 추가
       for (const keyword of keywords) {
-        const regex = new RegExp(keyword, 'g')
-        const matches = line.match(regex)
+        const safeKeyword = escapeRegex(keyword)
+        const matches = line.match(new RegExp(safeKeyword, 'gi'))
         if (matches) {
-          currentScore += matches.length * 0.5  // 본문 매칭은 절반 가중치
+          currentScore += matches.length * 0.5
         }
       }
     }
   }
 
-  // 마지막 판례 추가
   if (currentPrecedent) {
     precedents.push({ text: currentPrecedent, score: currentScore })
   }
 
-  // 점수순 정렬
   precedents.sort((a, b) => b.score - a.score)
-
-  // 상위 N개만 반환
   const topResults = precedents.slice(0, maxResults)
 
   let resultText = `🔍 유사 판례 (총 ${topResults.length}건, 유사도순 정렬)\n\n`
   resultText += `검색 키워드: ${keywords.join(", ")}\n\n`
 
-  topResults.forEach((p, idx) => {
+  topResults.forEach((p) => {
     resultText += `${p.text}\n`
     resultText += `   유사도 점수: ${p.score.toFixed(1)}\n\n`
   })

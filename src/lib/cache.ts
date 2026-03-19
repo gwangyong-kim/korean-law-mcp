@@ -22,10 +22,12 @@ export class SimpleCache {
     // TTL default: 24 hours
 
     // If cache is full, evict expired entries first, then oldest
-    if (this.cache.size >= this.maxSize) {
+    if (this.cache.size >= this.maxSize && !this.cache.has(key)) {
       this.evictOne()
     }
 
+    // 기존 키 업데이트 시 Map 순서 끝으로 이동 (LRU 정합성)
+    this.cache.delete(key)
     this.cache.set(key, {
       data,
       timestamp: Date.now(),

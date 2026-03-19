@@ -17,8 +17,22 @@ export async function startSSEServer(server: Server, port: number) {
   const app = express()
   const transports: Record<string, SessionTransport> = {}
 
-  // JSON 파싱 미들웨어
-  app.use(express.json())
+  // JSON 파싱 미들웨어 (크기 제한 명시)
+  app.use(express.json({ limit: "100kb" }))
+
+  // 유휴 세션 정리 (30분)
+  const SESSION_IDLE_TIMEOUT = 30 * 60 * 1000
+  const MAX_SESSIONS = 100
+  setInterval(() => {
+    const now = Date.now()
+    for (const sid of Object.keys(transports)) {
+      const session = transports[sid] as SessionTransport & { lastAccess?: number }
+      if (session.lastAccess && now - session.lastAccess > SESSION_IDLE_TIMEOUT) {
+        try { session.transport.close() } catch { /* ignore */ }
+        delete transports[sid]
+      }
+    }
+  }, 5 * 60 * 1000).unref()
 
   // CORS 설정 (MCP Streamable HTTP 스펙 준수)
   app.use((req, res, next) => {
@@ -43,7 +57,7 @@ export async function startSSEServer(server: Server, port: number) {
   app.get("/", (req, res) => {
     res.json({
       name: "Korean Law MCP Server",
-      version: "1.7.0",
+      version: "2.1.0",
       status: "running",
       protocol: "streamable-http",
       endpoints: {
@@ -71,7 +85,8 @@ export async function startSSEServer(server: Server, port: number) {
       let transport: StreamableHTTPServerTransport
 
       if (sessionId && transports[sessionId]) {
-        // 기존 세션 재사용
+        // 기존 세션 재사용 + 접근 시각 갱신
+        ;(transports[sessionId] as any).lastAccess = Date.now()
         transport = transports[sessionId].transport
       } else if (!sessionId && isInitializeRequest(req.body)) {
         // 새 세션 초기화
@@ -80,8 +95,13 @@ export async function startSSEServer(server: Server, port: number) {
           sessionIdGenerator: () => randomUUID(),
           eventStore,
           onsessioninitialized: (newSessionId) => {
+            // 세션 수 제한
+            if (Object.keys(transports).length >= MAX_SESSIONS) {
+              console.error(`Max sessions (${MAX_SESSIONS}) reached, rejecting new session`)
+              return
+            }
             console.error(`Session initialized: ${newSessionId}`)
-            transports[newSessionId] = { transport }
+            transports[newSessionId] = { transport, lastAccess: Date.now() } as any
           }
         })
 

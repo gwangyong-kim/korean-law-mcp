@@ -5,6 +5,7 @@
 import { z } from "zod"
 import type { LawApiClient } from "../lib/api-client.js"
 import { getLawText } from "./law-text.js"
+import { truncateResponse } from "../lib/schemas.js"
 
 export const ParseArticleLinksSchema = z.object({
   mst: z.string().optional().describe("법령일련번호"),
@@ -66,7 +67,7 @@ export async function parseArticleLinks(
     return {
       content: [{
         type: "text",
-        text: resultText
+        text: truncateResponse(resultText)
       }]
     }
   } catch (error) {

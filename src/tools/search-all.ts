@@ -5,6 +5,7 @@
 
 import { z } from "zod"
 import type { LawApiClient } from "../lib/api-client.js"
+import { truncateResponse } from "../lib/schemas.js"
 import { searchLaw } from "./search.js"
 import { searchAdminRule } from "./admin-rule.js"
 import { searchOrdinance } from "./ordinance-search.js"
@@ -117,7 +118,7 @@ export async function searchAll(
     return {
       content: [{
         type: "text",
-        text: output
+        text: truncateResponse(output)
       }]
     }
   } catch (error) {

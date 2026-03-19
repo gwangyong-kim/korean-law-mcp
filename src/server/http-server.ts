@@ -21,7 +21,7 @@ const sessions = new Map<string, SessionInfo>()
 
 export async function startHTTPServer(server: Server, port: number) {
   const app = express()
-  app.use(express.json())
+  app.use(express.json({ limit: "100kb" }))
 
   // 30분 idle 세션 자동 정리 (5분마다 체크)
   const SESSION_MAX_IDLE = 30 * 60 * 1000 // 30분
@@ -95,7 +95,7 @@ export async function startHTTPServer(server: Server, port: number) {
   app.get("/", (req, res) => {
     res.json({
       name: "Korean Law MCP Server",
-      version: "1.8.0",
+      version: "2.1.0",
       status: "running",
       transport: "streamable-http",
       endpoints: {

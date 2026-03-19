@@ -114,21 +114,27 @@ async function searchByType(
     const parser = new DOMParser()
     const doc = parser.parseFromString(xmlText, "text/xml")
 
-    const tagName = type === "ordinance" ? "ordin" : "law"
+    // 검색 대상별 XML 태그명 매핑
+    const tagMap: Record<string, string> = { law: "law", admin_rule: "admrul", ordinance: "ordin" }
+    const tagName = tagMap[type] || "law"
     const items = doc.getElementsByTagName(tagName)
 
     for (let i = 0; i < items.length; i++) {
       const item = items[i]
 
+      // 검색 대상별 필드명 매핑
       const name = item.getElementsByTagName("법령명한글")[0]?.textContent ||
+        item.getElementsByTagName("행정규칙명")[0]?.textContent ||
         item.getElementsByTagName("자치법규명")[0]?.textContent ||
         "알 수 없음"
 
       const id = item.getElementsByTagName("법령ID")[0]?.textContent ||
+        item.getElementsByTagName("행정규칙일련번호")[0]?.textContent ||
         item.getElementsByTagName("자치법규ID")[0]?.textContent ||
         ""
 
       const date = item.getElementsByTagName("공포일자")[0]?.textContent ||
+        item.getElementsByTagName("시행일자")[0]?.textContent ||
         item.getElementsByTagName("제정일자")[0]?.textContent ||
         ""
 

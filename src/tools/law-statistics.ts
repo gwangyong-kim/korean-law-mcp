@@ -5,6 +5,7 @@
 import { z } from "zod"
 import { DOMParser } from "@xmldom/xmldom"
 import type { LawApiClient } from "../lib/api-client.js"
+import { truncateResponse } from "../lib/schemas.js"
 
 export const LawStatisticsSchema = z.object({
   days: z.number().min(1).max(90).optional().default(30).describe("최근 변경 분석 기간 (일 단위, 기본값: 30, 최대: 90)"),
@@ -103,7 +104,7 @@ async function getRecentChanges(
   return {
     content: [{
       type: "text",
-      text: resultText
+      text: truncateResponse(resultText)
     }]
   }
 }

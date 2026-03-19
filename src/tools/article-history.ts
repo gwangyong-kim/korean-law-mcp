@@ -5,6 +5,7 @@
 import { z } from "zod"
 import { DOMParser } from "@xmldom/xmldom"
 import type { LawApiClient } from "../lib/api-client.js"
+import { truncateResponse } from "../lib/schemas.js"
 
 /**
  * JO 코드를 읽기 쉬운 형식으로 변환
@@ -126,7 +127,7 @@ export async function getArticleHistory(
     return {
       content: [{
         type: "text",
-        text: resultText
+        text: truncateResponse(resultText)
       }]
     }
   } catch (error) {

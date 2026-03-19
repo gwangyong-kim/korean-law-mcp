@@ -5,6 +5,7 @@
 import { z } from "zod"
 import type { LawApiClient } from "../lib/api-client.js"
 import { getPrecedentText } from "./precedents.js"
+import { truncateResponse } from "../lib/schemas.js"
 
 export const ExtractKeywordsSchema = z.object({
   id: z.string().describe("판례일련번호"),
@@ -49,7 +50,7 @@ export async function extractPrecedentKeywords(
     return {
       content: [{
         type: "text",
-        text: resultText
+        text: truncateResponse(resultText)
       }]
     }
   } catch (error) {
