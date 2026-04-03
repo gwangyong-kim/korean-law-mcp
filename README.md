@@ -66,15 +66,84 @@
 
 ---
 
-## 빠른 시작
+## 설치 및 사용법
 
-### MCP 서버 (Claude Desktop / Cursor / Windsurf)
+### 0단계: API 키 발급 (무료, 1분)
+
+모든 방법에 공통으로 필요한 **법제처 Open API 인증키(OC)**를 먼저 발급받으세요.
+
+1. [법제처 Open API 신청 페이지](https://open.law.go.kr/LSO/openApi/guideList.do)에 접속합니다.
+2. 회원가입 후 로그인합니다.
+3. **"Open API 사용 신청"** 버튼을 누릅니다.
+4. 신청서를 작성하면 **인증키(OC)**가 발급됩니다. (예: `honggildong`)
+5. 이 인증키를 아래 설정에서 사용합니다.
+
+---
+
+### 방법 1: 웹에서 바로 사용 (설치 없음, 가장 쉬움)
+
+Claude.ai, ChatGPT 등 **웹 AI에서 MCP를 지원하는 경우** 아무것도 설치하지 않고 주소만 입력하면 됩니다.
+
+**Claude.ai 기준 설정 방법:**
+
+1. [claude.ai](https://claude.ai)에 로그인합니다.
+2. 채팅 화면에서 **도구 아이콘** (렌치 모양)을 클릭합니다.
+3. **"MCP 서버 추가"** 또는 **"Add MCP Server"**를 선택합니다.
+4. 아래 주소를 입력합니다. `honggildong` 부분을 **0단계에서 발급받은 본인 인증키**로 바꾸세요:
+
+```
+https://korean-law-mcp.fly.dev/mcp?profile=lite&oc=honggildong
+```
+
+5. 저장하면 끝! 이제 대화창에 "근로기준법 제74조 알려줘"라고 입력하면 AI가 법령을 검색해줍니다.
+
+> **lite vs full 차이**: 위 주소는 lite 모드(14개 도구)입니다. 14개로도 89개 전체 기능을 사용할 수 있어요. AI가 필요할 때 나머지 도구를 알아서 꺼내 씁니다. 모든 도구를 직접 보고 싶으면 주소에서 `profile=lite&`를 빼면 됩니다.
+
+---
+
+### 방법 2: AI 데스크톱 앱에서 사용 (설치 없음)
+
+Claude Desktop, Cursor, Windsurf 같은 **데스크톱 앱**을 쓰고 있다면, 설정 파일에 아래 내용을 추가하세요.
+
+**설정 파일 위치 찾기:**
+
+| 앱 이름 | Windows | Mac |
+|---------|---------|-----|
+| Claude Desktop | `%APPDATA%\Claude\claude_desktop_config.json` | `~/Library/Application Support/Claude/claude_desktop_config.json` |
+| Cursor | 프로젝트 폴더 안 `.cursor/mcp.json` | 프로젝트 폴더 안 `.cursor/mcp.json` |
+| Windsurf | 프로젝트 폴더 안 `.windsurf/mcp.json` | 프로젝트 폴더 안 `.windsurf/mcp.json` |
+
+**설정 파일에 추가할 내용** (`honggildong`을 본인 인증키로 바꾸세요):
+
+```json
+{
+  "mcpServers": {
+    "korean-law": {
+      "url": "https://korean-law-mcp.fly.dev/mcp?oc=honggildong"
+    }
+  }
+}
+```
+
+> 이미 다른 MCP 서버가 설정되어 있다면, `"mcpServers": { ... }` 안에 `"korean-law": { ... }` 부분만 추가하면 됩니다.
+
+저장 후 앱을 **재시작**하면 법령 도구가 활성화됩니다.
+
+---
+
+### 방법 3: 내 컴퓨터에 직접 설치 (오프라인 가능)
+
+인터넷 없이 쓰고 싶거나, 원격 서버를 거치지 않으려면 직접 설치할 수 있습니다.
+
+**사전 준비:** [Node.js](https://nodejs.org) 18 이상이 설치되어 있어야 합니다.
+
+**1. 터미널(명령 프롬프트)을 열고 설치합니다:**
 
 ```bash
 npm install -g korean-law-mcp
 ```
 
-MCP 클라이언트 설정에 추가:
+**2. AI 앱 설정 파일에 아래 내용을 추가합니다** (`honggildong`을 본인 인증키로 바꾸세요):
 
 ```json
 {
@@ -82,68 +151,50 @@ MCP 클라이언트 설정에 추가:
     "korean-law": {
       "command": "korean-law-mcp",
       "env": {
-        "LAW_OC": "your-api-key"
+        "LAW_OC": "honggildong"
       }
     }
   }
 }
 ```
 
-API 키는 [법제처 Open API](https://open.law.go.kr/LSO/openApi/guideResult.do)에서 무료 발급.
+**3. 앱을 재시작하면 완료!**
 
-| 클라이언트 | 설정 파일 |
-|-----------|----------|
-| Claude Desktop | `%APPDATA%\Claude\claude_desktop_config.json` (Win) / `~/Library/Application Support/Claude/claude_desktop_config.json` (Mac) |
-| Cursor | `.cursor/mcp.json` |
-| Windsurf | `.windsurf/mcp.json` |
-| Continue | `~/.continue/config.json` |
-| Zed | `~/.config/zed/settings.json` |
+---
 
-### 원격 MCP (설치 없이 바로)
+### 방법 4: 터미널(CLI)에서 직접 사용
 
-API 키를 URL에 포함하여 바로 사용:
-
-```json
-{
-  "mcpServers": {
-    "korean-law": {
-      "url": "https://korean-law-mcp.fly.dev/mcp?oc=your-api-key"
-    }
-  }
-}
-```
-
-**Claude.ai 등 웹 클라이언트** — 컨텍스트 절약을 위해 lite 프로필 권장:
-
-```
-https://korean-law-mcp.fly.dev/mcp?profile=lite&oc=your-api-key
-```
-
-> lite 프로필은 체인 8개 + 핵심 4개 + 메타 2개 = **14개 도구**로 동일 기능 커버. 특수 도구가 필요하면 `discover_tools` → `execute_tool`로 접근.
-
-**API 키 전달 방법** (우선순위순):
-
-| 방법 | 예시 | 설명 |
-|------|------|------|
-| URL 쿼리 | `?oc=your-key` | 웹 클라이언트에서 가장 간편. 세션 전체에 자동 적용 |
-| HTTP 헤더 | `apikey: your-key` | `law-oc`, `x-api-key`, `Authorization: Bearer` 등도 지원 |
-| 도구 파라미터 | `apiKey: "your-key"` | 개별 도구 호출 시 직접 전달 |
-
-> API 키는 [법제처 Open API](https://open.law.go.kr/LSO/openApi/guideResult.do)에서 무료 발급.
-
-### CLI
+개발자라면 터미널에서 직접 법령을 검색할 수 있습니다.
 
 ```bash
+# 설치
 npm install -g korean-law-mcp
-export LAW_OC=your-api-key
 
-korean-law search_law --query "관세법"
-korean-law get_law_text --mst 160001 --jo "제38조"
-korean-law search_precedents --query "부당해고"
-korean-law list                          # 89개 전체 도구 목록
-korean-law list --category 판례          # 카테고리별 필터
-korean-law help search_law               # 도구 도움말
+# 인증키 설정 (honggildong을 본인 키로 바꾸세요)
+export LAW_OC=honggildong        # Mac/Linux
+set LAW_OC=honggildong           # Windows CMD
+$env:LAW_OC="honggildong"       # Windows PowerShell
+
+# 사용 예시
+korean-law "민법 제1조"                    # 자연어로 바로 조회
+korean-law search_law --query "관세법"     # 도구 직접 호출
+korean-law list                            # 89개 전체 도구 목록
+korean-law list --category 판례            # 카테고리별 필터
+korean-law help search_law                 # 도구별 도움말
 ```
+
+---
+
+### API 키 전달 방법 정리
+
+여러 방법으로 인증키를 전달할 수 있습니다. 위에서부터 우선 적용됩니다:
+
+| 방법 | 사용법 | 언제 쓰나 |
+|------|--------|-----------|
+| URL에 포함 | 주소 끝에 `?oc=내키` | 웹 클라이언트에서 가장 간편 |
+| HTTP 헤더 | `apikey: 내키` | 프로그래밍으로 연동할 때 |
+| 환경변수 | `LAW_OC=내키` | 로컬 설치(방법 3, 4) |
+| 도구 파라미터 | `apiKey: "내키"` | 특정 요청만 다른 키 쓸 때 |
 
 ---
 
