@@ -5,7 +5,7 @@
 import { z } from "zod"
 import type { LawApiClient } from "../lib/api-client.js"
 import { cleanHtml } from "../lib/article-parser.js"
-import { buildJO } from "../lib/law-parser.js"
+import { buildOrdinanceJO } from "../lib/law-parser.js"
 import { truncateResponse } from "../lib/schemas.js"
 import { formatToolError } from "../lib/errors.js"
 
@@ -26,7 +26,7 @@ export async function getOrdinance(
     let joCode: string | undefined
     if (input.jo) {
       try {
-        joCode = /제\d+조/.test(input.jo) ? buildJO(input.jo) : input.jo
+        joCode = /제\d+조/.test(input.jo) ? buildOrdinanceJO(input.jo) : input.jo
       } catch {
         // JO 코드 변환 실패 시 클라이언트 필터링만 사용
       }
@@ -74,7 +74,7 @@ export async function getOrdinance(
           if (!title.startsWith(joNorm)) return false
           // "제20조" 뒤에 "의" 가 오면 다른 조문 (제20조의2 등)
           const rest = title.slice(joNorm.length)
-          return rest === "" || rest.startsWith("(") || rest.startsWith(" ")
+          return rest === "" || rest.startsWith("(")
         })
 
         if (matched.length === 0) {
