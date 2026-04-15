@@ -3,6 +3,12 @@ import type { LawApiClient } from "../lib/api-client.js"
 import { parsePrecedentXML } from "../lib/xml-parser.js"
 import { truncateResponse } from "../lib/schemas.js"
 import { formatToolError } from "../lib/errors.js"
+import {
+  compactBody,
+  densifyLawRefs,
+  densifyPrecedentRefs,
+  stripRepeatedSummary,
+} from "../lib/decision-compact.js"
 
 export const searchPrecedentsSchema = z.object({
   query: z.string().optional().describe("검색 키워드 (예: '자동차', '담보권')"),
@@ -105,6 +111,7 @@ export async function searchPrecedents(
 export const getPrecedentTextSchema = z.object({
   id: z.string().describe("판례일련번호 (search_precedents 결과에서 획득)"),
   caseName: z.string().optional().describe("사건명 (선택, 검증용)"),
+  full: z.boolean().optional().describe("true=전문 그대로. 미지정 시 '전문' 섹션을 계단식 축약 (판시/요지/참조는 항상 full)"),
   apiKey: z.string().optional().describe("법제처 Open API 인증키(OC). 사용자가 제공한 경우 전달"),
 });
 
@@ -173,15 +180,17 @@ export async function getPrecedentText(
   }
 
   if (content.참조조문) {
-    output += `참조조문:\n${content.참조조문}\n\n`;
+    output += `참조조문:\n${densifyLawRefs(content.참조조문)}\n\n`;
   }
 
   if (content.참조판례) {
-    output += `참조판례:\n${content.참조판례}\n\n`;
+    output += `참조판례:\n${densifyPrecedentRefs(content.참조판례)}\n\n`;
   }
 
   if (content.전문) {
-    output += `전문:\n${content.전문}\n`;
+    const deduped = stripRepeatedSummary(content.전문, [content.판시사항, content.판결요지]);
+    const compacted = compactBody(deduped, { full: args.full });
+    output += `전문:\n${compacted}\n`;
   }
 
   return {

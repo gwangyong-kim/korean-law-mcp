@@ -112,26 +112,18 @@ const GET_HANDLERS: Record<Domain, (api: LawApiClient, args: any) => Promise<Loo
 // search_decisions
 // ========================================
 
-const domainDescriptions = DOMAINS.map(d => `${d}(${DOMAIN_LABELS[d]})`).join(", ")
-
 export const SearchDecisionsSchema = z.object({
   domain: z.enum(DOMAINS).describe(
-    `검색 대상 도메인: ${domainDescriptions}`
+    "도메인 선택 (enum 값 참조)"
   ),
   query: z.string().optional().describe("검색 키워드"),
-  display: z.number().min(1).max(100).default(20).optional().describe("페이지당 결과 수 (기본:20)"),
-  page: z.number().min(1).default(1).optional().describe("페이지 번호 (기본:1)"),
-  sort: z.string().optional().describe("정렬: lasc/ldes(이름순), dasc/ddes(날짜순), nasc/ndes(번호순)"),
+  display: z.number().min(1).max(100).default(20).optional().describe("결과 수 (기본20)"),
+  page: z.number().min(1).default(1).optional().describe("페이지 (기본1)"),
+  sort: z.string().optional().describe("정렬: lasc/ldes/dasc/ddes/nasc/ndes"),
   options: z.record(z.string(), z.unknown()).optional().describe(
-    "도메인별 추가 옵션. " +
-    "precedent: {court, caseNumber, fromDate, toDate}, " +
-    "tax_tribunal: {cls, gana, dpaYd, rslYd}, " +
-    "customs: {inq, rpl, gana, explYd}, " +
-    "constitutional: {caseNumber}, " +
-    "interpretation: {fromDate, toDate}, " +
-    "treaty: {cls, natCd, eftYd, concYd}"
+    "도메인별 옵션. prec:{court,caseNumber,fromDate,toDate} tax_tribunal:{cls,gana,dpaYd,rslYd} customs:{inq,rpl,gana,explYd} constitutional:{caseNumber} interpretation:{fromDate,toDate} treaty:{cls,natCd,eftYd,concYd}"
   ),
-  apiKey: z.string().optional().describe("법제처 Open API 인증키(OC)"),
+  apiKey: z.string().optional(),
 })
 
 export type SearchDecisionsInput = z.infer<typeof SearchDecisionsSchema>
@@ -177,17 +169,13 @@ export async function searchDecisions(
 // ========================================
 
 export const GetDecisionTextSchema = z.object({
-  domain: z.enum(DOMAINS).describe(
-    `조회 대상 도메인: ${domainDescriptions}`
-  ),
-  id: z.string().describe("일련번호/ID (search_decisions 결과에서 획득)"),
+  domain: z.enum(DOMAINS).describe("도메인 선택 (enum 값 참조)"),
+  id: z.string().describe("일련번호/ID (search 결과에서 획득)"),
+  full: z.boolean().optional().describe("true=본문 전문 그대로. 미지정=이유/전문 섹션 계단식 축약 (판시·요지·주문은 항상 full)"),
   options: z.record(z.string(), z.unknown()).optional().describe(
-    "도메인별 추가 옵션. " +
-    "treaty: {chrClsCd: '010202'(한글)/'010203'(영문)}, " +
-    "english_law: {mst, lawName}, " +
-    "precedent/constitutional/admin_appeal/interpretation: {caseName}"
+    "도메인별 옵션. treaty:{chrClsCd:'010202'(한)/'010203'(영)} english_law:{mst,lawName} prec/constitutional/admin_appeal/interpretation:{caseName}"
   ),
-  apiKey: z.string().optional().describe("법제처 Open API 인증키(OC)"),
+  apiKey: z.string().optional(),
 })
 
 export type GetDecisionTextInput = z.infer<typeof GetDecisionTextSchema>
@@ -211,10 +199,11 @@ export async function getDecisionText(
       : { id: input.id }
 
     if (input.apiKey) args.apiKey = input.apiKey
+    if (input.full !== undefined) args.full = input.full
 
     // 도메인별 추가 옵션 병합 (핵심 필드 덮어쓰기 방지)
     if (input.options) {
-      const reserved = new Set(["id", "apiKey", "domain"])
+      const reserved = new Set(["id", "apiKey", "domain", "full"])
       for (const [k, v] of Object.entries(input.options)) {
         if (!reserved.has(k)) args[k] = v
       }

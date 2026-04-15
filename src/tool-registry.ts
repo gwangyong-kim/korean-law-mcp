@@ -582,49 +582,49 @@ export const allTools: McpTool[] = [
   // === 체인 도구 (다단계 자동 실행) ===
   {
     name: "chain_law_system",
-    description: "[⛓체인] 법령 구조·체계 질문 시 사용. 법령검색→3단비교(법률·시행령·시행규칙)→조문→별표 자동 연쇄. scenario='delegation'이면 위임입법 미이행 감시, 'impact'이면 개정 영향도 분석 추가. 예: '건축법 체계', '관세법 위임입법 현황', '국민건강보험법 영향도 분석'.",
+    description: "[⛓] 법령 구조·체계. 법령→3단비교(법률·시행령·시행규칙)→조문→별표. scenario: delegation(위임입법감시)/impact(개정영향도)",
     schema: chainLawSystemSchema,
     handler: chainLawSystem
   },
   {
     name: "chain_action_basis",
-    description: "[⛓체인] 허가·인가·처분·기준 질문 시 사용. 3단비교→해석례→판례→행정심판 병렬. scenario='penalty'이면 처분기준표(별표)+감경판례+벌칙개정이력 추가. 예: '건축허가 거부 근거', '식품위생법 과태료 감경', '영업정지 처분 기준'.",
+    description: "[⛓] 허가·인가·처분·기준 근거. 3단비교+해석례+판례+행심 병렬. scenario: penalty(처분기준표+감경판례+벌칙이력)",
     schema: chainActionBasisSchema,
     handler: chainActionBasis
   },
   {
     name: "chain_dispute_prep",
-    description: "[⛓체인] 불복·소송·심판 질문 시 사용. 판례→행정심판→도메인 결정례 병렬. 예: '과태료 불복 방법', '징계처분 취소소송 판례'.",
+    description: "[⛓] 불복·소송·심판 대비. 판례+행심+도메인결정례 병렬",
     schema: chainDisputePrepSchema,
     handler: chainDisputePrep
   },
   {
     name: "chain_amendment_track",
-    description: "[⛓체인] 법령 개정·변경·연혁 질문 시 사용. 신구대조+조문이력 자동 연쇄. scenario='timeline'이면 개정 구간별 판례·해석례 시계열 매핑 추가. 예: '민법 최근 개정', '관세법 개정이력 시계열'.",
+    description: "[⛓] 법령 개정·연혁. 신구대조+조문이력. scenario: timeline(구간별 판례·해석례 시계열)",
     schema: chainAmendmentTrackSchema,
     handler: chainAmendmentTrack
   },
   {
     name: "chain_ordinance_compare",
-    description: "[⛓체인] 자치법규(조례·규칙) 검색·조회·비교 시 사용. 상위법령→위임체계→전국 조례검색 자동 연쇄. scenario='compliance'이면 상위법 적합성 검증(헌재·행심 위법판결+근거분석) 추가. 예: '광진구 복무 조례', '조례 상위법 위반 검증'.",
+    description: "[⛓] 자치법규(조례·규칙). 상위법→위임체계→전국조례검색. scenario: compliance(상위법 적합성 검증)",
     schema: chainOrdinanceCompareSchema,
     handler: chainOrdinanceCompare
   },
   {
     name: "chain_full_research",
-    description: "[⛓체인] 복합 질문·종합 조사 시 사용. AI검색→법령→판례→해석례 병렬 수집. scenario='customs'이면 관세·통관 종합(관세3법+해석례+FTA조약+세율표+조세심판) 추가. 예: '음주운전 처벌 기준', '수입 통관 법적 체크', 'FTA 원산지 규정'.",
+    description: "[⛓] 복합·종합 리서치. AI검색+법령+판례+해석례 병렬. scenario: customs(관세3법+해석+FTA+조세심판)",
     schema: chainFullResearchSchema,
     handler: chainFullResearch
   },
   {
     name: "chain_procedure_detail",
-    description: "[⛓체인] 신청·절차·비용·서식 질문 시 사용. 법령→3단비교→별표/서식 자동 연쇄. scenario='manual'이면 공무원 처리 매뉴얼(행정규칙+자치법규 특칙+해석례) 추가. 예: '건축허가 절차', '건축허가 처리 방법 매뉴얼'.",
+    description: "[⛓] 절차·비용·서식. 법령→3단비교→별표/서식. scenario: manual(행정규칙+자치특칙+해석례)",
     schema: chainProcedureDetailSchema,
     handler: chainProcedureDetail
   },
   {
     name: "chain_document_review",
-    description: "[⛓체인] 계약서·약관·협정서 검토 시 사용. 리스크분석→법령검색→판례검색 자동 연쇄. 문서 텍스트를 입력하면 리스크+근거법령+관련판례 제공.",
+    description: "[⛓] 계약서·약관·협정서 검토. 리스크분석+근거법령+관련판례",
     schema: chainDocumentReviewSchema,
     handler: chainDocumentReview
   },
@@ -640,13 +640,13 @@ export const allTools: McpTool[] = [
   // === 메타 도구 (lite 프로필용) ===
   {
     name: "discover_tools",
-    description: "[메타] 위 체인/직접 도구로 처리 불가능할 때 사용. 73개 전문 도구(조세심판·관세·헌재·행정심판·공정위·개인정보위·노동위·학칙·조약·영문법령·용어사전 등)를 카테고리별 검색. 결과로 나온 도구명을 execute_tool에 전달.",
+    description: "[메타] 위 체인/직접 도구로 안 되는 경우. 73개 전문도구(조세심판·관세·헌재·행심·공정위·개인정보위·노동위·학칙·조약·영문법령·용어 등) 카테고리 검색",
     schema: DiscoverToolsSchema,
     handler: discoverTools
   },
   {
     name: "execute_tool",
-    description: "[메타] discover_tools로 찾은 전문 도구를 프록시 실행. tool_name에 도구명, params에 파라미터 객체 전달. 예: execute_tool(tool_name='search_tax_tribunal_decisions', params={query:'부가세'}).",
+    description: "[메타] discover_tools 결과 도구를 프록시 실행. tool_name + params",
     schema: ExecuteToolSchema,
     handler: executeTool
   },
@@ -654,13 +654,13 @@ export const allTools: McpTool[] = [
   // === 통합 도구 (v3) ===
   {
     name: "search_decisions",
-    description: "[통합검색] 판례·해석례·헌재·행심·조세심판·관세·공정위·개인정보위·노동위·권익위·소청심사·학칙·공사공단·공공기관·조약·영문법령 등 17개 도메인 통합 검색. domain 파라미터로 선택.",
+    description: "[통합검색] 17개 도메인(판례·해석례·헌재·행심·조세심판·관세·공정위·개인정보위·노동위·권익위·소청심사·학칙·공사공단·공공기관·조약·영문법령) 통합 검색. domain으로 선택",
     schema: SearchDecisionsSchema,
     handler: searchDecisions
   },
   {
     name: "get_decision_text",
-    description: "[통합조회] 17개 도메인(판례·결정례·재결례·학칙·조약·영문법령 등) 전문 조회. domain+id로 지정.",
+    description: "[통합조회] 17개 도메인 전문 조회. domain+id. full=false(기본) 시 본문 계단식 축약",
     schema: GetDecisionTextSchema,
     handler: getDecisionText
   },
