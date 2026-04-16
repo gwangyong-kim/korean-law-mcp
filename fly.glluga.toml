@@ -1,0 +1,27 @@
+# fly.toml for the personal deployment (glluga-law-mcp).
+# fly.toml은 upstream(chrisryugj/korean-law-mcp)을 추종하고,
+# 이 파일은 GitHub Actions에서 --config fly.glluga.toml 로 참조한다.
+
+app = 'glluga-law-mcp'
+primary_region = 'nrt'
+
+[build]
+  dockerfile = 'Dockerfile'
+
+[env]
+  NODE_ENV = 'production'
+  PORT = '3000'
+  RATE_LIMIT_RPM = '300'
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = 'suspend'
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  memory = '256mb'
+  cpu_kind = 'shared'
+  cpus = 1
+  memory_mb = 256
