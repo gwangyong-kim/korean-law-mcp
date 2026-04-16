@@ -1,0 +1,36 @@
+name: Sync Upstream
+
+on:
+  schedule:
+    - cron: '0 3 * * *' # 매일 UTC 03:00 (KST 12:00)
+  workflow_dispatch:
+
+jobs:
+  sync-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync fork with upstream
+        id: sync
+        run: |
+          RESULT=$(gh api repos/${{ github.repository }}/merge-upstream \
+            -f branch=main --jq '.merge_type // empty' 2>&1) || RESULT=""
+          echo "merge_type=${RESULT:-none}" >> "$GITHUB_OUTPUT"
+          echo "Sync result: ${RESULT:-already up to date}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout
+        if: steps.sync.outputs.merge_type != 'none'
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup flyctl
+        if: steps.sync.outputs.merge_type != 'none'
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy to Fly.io
+        if: steps.sync.outputs.merge_type != 'none'
+        run: flyctl deploy --remote-only --depot=false --config fly.glluga.toml
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
