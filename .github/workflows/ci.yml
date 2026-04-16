@@ -39,6 +39,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: superfly/flyctl-actions/setup-flyctl@master
       - name: Deploy to Fly.io
-        run: flyctl deploy --remote-only --config fly.glluga.toml
+        # --depot=false: app-scope deploy token으로는 org-scope depot builder에 접근 불가.
+        # legacy remote builder로 fallback (app-scope라 deploy token 권한 범위 내).
+        run: flyctl deploy --remote-only --depot=false --config fly.glluga.toml
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
