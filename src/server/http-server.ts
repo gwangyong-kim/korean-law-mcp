@@ -12,7 +12,6 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { requestContext } from "../lib/session-state.js"
 import { maskSensitiveUrl } from "../lib/fetch-with-retry.js"
 import { VERSION } from "../version.js"
-import { type ToolProfile, parseProfile } from "../lib/tool-profiles.js"
 
 /**
  * 에러 메시지에서 민감 정보(API 키 포함 URL) scrub.
@@ -28,7 +27,7 @@ function scrubError(error: unknown): { message: string; stack?: string } {
   return { message: maskSensitiveUrl(String(error)) }
 }
 
-export async function startHTTPServer(createServer: (profile?: ToolProfile) => Server, port: number) {
+export async function startHTTPServer(createServer: () => Server, port: number) {
   const app = express()
   // trust proxy: TRUST_PROXY 환경변수로 조정 (기본 '1' = 첫 프록시만 신뢰).
   // 'true' 또는 'all'은 X-Forwarded-For 스푸핑으로 rate limit 우회 위험.
@@ -107,13 +106,13 @@ export async function startHTTPServer(createServer: (profile?: ToolProfile) => S
       transport: "streamable-http (stateless)",
       endpoints: {
         mcp: "/mcp",
-        "mcp-lite": "/mcp?profile=lite",
-        health: "/health"
+        health: "/health",
       },
-      profiles: {
-        lite: "14 tools (chains + meta, for web clients)",
-        full: "all tools (default)"
-      }
+      tools: {
+        exposed: 16,
+        total: 92,
+        description: "V3_EXPOSED 16개 직노출, 나머지 76개는 execute_tool 경유",
+      },
     })
   })
 
@@ -134,13 +133,11 @@ export async function startHTTPServer(createServer: (profile?: ToolProfile) => S
       (req.headers["authorization"] as string | undefined)?.replace(/^Bearer\s+/i, "") ||
       (req.headers["x-law-oc"] as string | undefined)
 
-    const profile = parseProfile(req.query.profile as string | undefined)
-
     let server: Server | undefined
     let transport: StreamableHTTPServerTransport | undefined
 
     try {
-      server = createServer(profile)
+      server = createServer()
       transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: undefined,  // ← stateless 모드
         enableJsonResponse: true,

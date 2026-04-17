@@ -1,5 +1,26 @@
 # Changelog
 
+## [3.5.1] - 2026-04-18
+
+### Removed (Dead Code)
+- **lite/full 프로필 체계 완전 제거** — V3_EXPOSED 16개 고정 노출 도입 후 실질 미사용 상태였던 죽은 코드 정리
+  - `lib/tool-profiles.ts`: `LITE_TOOLS` set(15개 엔트리), `parseProfile()`, `filterToolsByProfile()`, `ToolProfile` 타입 제거 (37줄 순감)
+  - `tool-registry.ts`: `registerTools(server, apiClient, profile?)` → `registerTools(server, apiClient)` 시그니처 단순화. `filterToolsByProfile` import 제거
+  - `index.ts`: `MCP_PROFILE` 환경변수 처리 제거, `parseProfile` / `ToolProfile` import 제거, `createServer(profile?)` → `createServer()`
+  - `server/http-server.ts`: `?profile=` 쿼리 파라미터 파싱 제거, `createServer(profile)` 호출부 단순화
+- 헬스 엔드포인트(`GET /`) 응답에서 거짓 `profiles: { lite, full }` 필드 제거 → `tools: { exposed: 16, total: 92 }` 정확 안내로 교체
+- `mcp-lite: "/mcp?profile=lite"` 엔드포인트 안내 제거 (원래부터 무시되던 값)
+
+### Why
+- v3 통합 후 `tool-registry.ts`가 `V3_EXPOSED.has(t.name)`로만 필터링하고 `filterToolsByProfile`은 import만 되어 있고 호출 안 됨 → `?profile=lite`든 `?profile=full`든 **완전히 동일하게 16개 도구** 반환
+- 헬스 엔드포인트는 여전히 `lite: "14 tools"` 안내 문구 노출 → 클라이언트에 **거짓 정보 전달** 중
+- 배포된 상태에서 breaking change 아님: 기존 `?profile=lite` 호출은 지금도 이미 무시되던 값이므로 동작 변화 없음
+
+### How to apply
+- STDIO 모드: `MCP_PROFILE` 환경변수 이제 무시됨 (설정 안 해도 됨)
+- HTTP 모드: `?profile=` 쿼리 파라미터 이제 무시됨 (모든 클라이언트 동일 16개 도구)
+- 문서/튜토리얼에서 lite/full 언급 있으면 제거 권장 (CHANGELOG 역사 맥락은 유지)
+
 ## [3.5.0] - 2026-04-18
 
 ### Added (Killer Feature)

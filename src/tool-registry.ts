@@ -9,7 +9,6 @@ import { z } from "zod"
 import type { LawApiClient } from "./lib/api-client.js"
 import type { McpTool } from "./lib/types.js"
 import { formatToolError } from "./lib/errors.js"
-import { type ToolProfile, filterToolsByProfile } from "./lib/tool-profiles.js"
 import { discoverTools, DiscoverToolsSchema, executeTool, ExecuteToolSchema, setAllToolsRef } from "./tools/meta-tools.js"
 import { searchDecisions, SearchDecisionsSchema, getDecisionText, GetDecisionTextSchema } from "./tools/unified-decisions.js"
 
@@ -726,7 +725,7 @@ const V3_EXPOSED = new Set([
 // 이름 기반 O(1) 조회용 Map
 const toolMap = new Map<string, McpTool>()
 
-export function registerTools(server: Server, apiClient: LawApiClient, profile: ToolProfile = "full") {
+export function registerTools(server: Server, apiClient: LawApiClient) {
   // Map 초기화
   toolMap.clear()
   for (const tool of allTools) toolMap.set(tool.name, tool)
@@ -734,10 +733,10 @@ export function registerTools(server: Server, apiClient: LawApiClient, profile: 
   // 메타 도구가 전체 도구 목록 참조할 수 있도록 주입
   setAllToolsRef(allTools)
 
-  // v3: 14개만 노출
+  // V3_EXPOSED 16개만 노출 (나머지는 execute_tool 경유)
   const exposedTools = allTools.filter(t => V3_EXPOSED.has(t.name))
 
-  // ListTools 핸들러 — 프로필에 맞는 도구만 노출
+  // ListTools 핸들러
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: exposedTools.map(tool => ({
       name: tool.name,

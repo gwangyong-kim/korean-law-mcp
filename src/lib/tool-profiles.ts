@@ -1,39 +1,9 @@
 /**
- * 도구 프로필 — 클라이언트별 도구 노출 제어
+ * 도구 카테고리 + 별칭 — discover_tools 자연어 매칭용.
  *
- * lite:  체인 중심 14개 (Claude 웹 등 컨텍스트 제한 클라이언트용)
- * full:  87개 전체 (Claude Code, STDIO 등 파워 클라이언트용)
+ * (lite/full 프로필은 v3.5.1에서 제거됨: V3_EXPOSED 도입 후 실질 미사용.
+ *  tool-registry.ts가 V3_EXPOSED 16개로 고정 노출 → 프로필 분기 의미 상실)
  */
-
-import type { McpTool } from "./types.js"
-
-export type ToolProfile = "lite" | "full"
-
-/**
- * lite 프로필에 노출할 도구 목록
- * - 체인 8개: 내부에서 하위 도구를 직접 호출하므로 기능 손실 없음
- * - 핵심 직접 도구 4개: 체인으로 커버 안 되는 단순 조회용
- * - 메타 도구 2개: discover_tools + execute_tool (특수 도구 접근용)
- */
-const LITE_TOOLS = new Set([
-  // 체인 도구 — 80%+ 유스케이스 커버
-  "chain_full_research",
-  "chain_law_system",
-  "chain_action_basis",
-  "chain_dispute_prep",
-  "chain_amendment_track",
-  "chain_ordinance_compare",
-  "chain_procedure_detail",
-  "chain_document_review",
-  // 핵심 직접 도구 — 단순 조회
-  "search_law",
-  "get_law_text",
-  "search_precedents",
-  "get_precedent_text",
-  // 메타 도구 — 나머지 73개 접근용
-  "discover_tools",
-  "execute_tool",
-])
 
 /**
  * 카테고리/도구명 별칭 — discover_tools가 사용자 자연어 입력을 매칭하기 위한 힌트.
@@ -105,14 +75,3 @@ export const TOOL_CATEGORIES: Record<string, string[]> = {
   "유틸리티": ["parse_jo_code", "get_law_abbreviations"],
 }
 
-/** 프로필 파싱 (잘못된 값이면 full) */
-export function parseProfile(value: string | undefined): ToolProfile {
-  if (value === "lite") return "lite"
-  return "full"
-}
-
-/** 프로필에 맞는 도구 필터링 */
-export function filterToolsByProfile(tools: McpTool[], profile: ToolProfile): McpTool[] {
-  if (profile === "full") return tools
-  return tools.filter(t => LITE_TOOLS.has(t.name))
-}
