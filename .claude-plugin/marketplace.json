@@ -8,7 +8,10 @@
   "plugins": [
     {
       "name": "korean-law",
-      "source": ".",
+      "source": {
+        "source": "github",
+        "repo": "chrisryugj/korean-law-mcp"
+      },
       "description": "법제처 41개 API → 16개 MCP 도구. 법령·판례·조례·조약 검색 + LLM 환각 방지 인용 검증",
       "version": "3.5.4",
       "author": {
@@ -16,8 +19,7 @@
       },
       "homepage": "https://github.com/chrisryugj/korean-law-mcp",
       "license": "MIT",
-      "keywords": ["korean-law", "법령", "판례", "법제처", "legal-ai"],
-      "category": "legal"
+      "keywords": ["korean-law", "법령", "판례", "법제처", "legal-ai"]
     }
   ]
 }
