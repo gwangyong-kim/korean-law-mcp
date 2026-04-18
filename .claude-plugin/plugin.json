@@ -29,7 +29,9 @@
   },
   "userConfig": {
     "api_key": {
-      "description": "법제처 OpenAPI 키 (https://open.law.go.kr/LSO/openApi/guideResult.do 에서 무료 발급)",
+      "type": "string",
+      "title": "법제처 API 키 (LAW_OC)",
+      "description": "법제처 OpenAPI 인증키. https://open.law.go.kr/LSO/openApi/guideResult.do 에서 무료 발급 (예: honggildong)",
       "sensitive": true
     }
   }
