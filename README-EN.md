@@ -1,6 +1,6 @@
 # Korean Law MCP
 
-**41 APIs compressed into 14 tools.** Search, retrieve, and analyze Korean law — statutes, precedents, ordinances, treaties, and more.
+**41 APIs compressed into 16 tools.** Search, retrieve, and analyze Korean law — statutes, precedents, ordinances, treaties + **LLM hallucination guard for legal citations**.
 
 [![npm version](https://img.shields.io/npm/v/korean-law-mcp.svg)](https://www.npmjs.com/package/korean-law-mcp)
 [![MCP 1.27](https://img.shields.io/badge/MCP-1.27-blue)](https://modelcontextprotocol.io)
@@ -15,7 +15,29 @@
 
 ---
 
-## What's New in v3.2.0 — Smart Scenarios
+## What's New in v3.5 — Citation Hallucination Guard
+
+**Catches fake article citations in AI-generated legal answers in real time.** Cross-verifies every citation against Korea's official law database.
+
+```
+"Under Civil Act Article 750, damages may be claimed for tort;
+ Labor Standards Act Article 60 Paragraph 1 provides annual leave;
+ Commercial Act Article 401-2 Paragraph 7 imposes director liability;
+ Criminal Act Article 9999 imposes aggravated punishment."
+```
+
+→ Run `verify_citations` (actual verification result against 법제처 API):
+
+- ✓ Civil Act Article 750 (Tort liability) — exists
+- ✓ Labor Standards Act Article 60 (Annual paid leave) Paragraph 1 — exists
+- ✗ **Commercial Act Article 401-2 — Paragraph 7 doesn't exist (max Paragraph 2)**
+- ✗ **Criminal Act Article 9999 — no such article (valid range: Art.1~Art.372)**
+
+**Don't blindly trust ChatGPT/Claude legal answers.** Essential reliability check for legal AI services, law firms, students, contract review.
+
+---
+
+## What's New in v3.2.0+ — Smart Scenarios
 
 **Same 14 tools, 7 new analysis scenarios.** Just ask in natural language — the AI detects what you need and runs extra analysis automatically.
 

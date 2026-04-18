@@ -1,39 +1,45 @@
 /**
- * 도구 프로필 — 클라이언트별 도구 노출 제어
+ * 도구 카테고리 + 별칭 — discover_tools 자연어 매칭용.
  *
- * lite:  체인 중심 14개 (Claude 웹 등 컨텍스트 제한 클라이언트용)
- * full:  87개 전체 (Claude Code, STDIO 등 파워 클라이언트용)
+ * (lite/full 프로필은 v3.5.1에서 제거됨: V3_EXPOSED 도입 후 실질 미사용.
+ *  tool-registry.ts가 V3_EXPOSED 16개로 고정 노출 → 프로필 분기 의미 상실)
  */
-
-import type { McpTool } from "./types.js"
-
-export type ToolProfile = "lite" | "full"
 
 /**
- * lite 프로필에 노출할 도구 목록
- * - 체인 8개: 내부에서 하위 도구를 직접 호출하므로 기능 손실 없음
- * - 핵심 직접 도구 4개: 체인으로 커버 안 되는 단순 조회용
- * - 메타 도구 2개: discover_tools + execute_tool (특수 도구 접근용)
+ * 카테고리/도구명 별칭 — discover_tools가 사용자 자연어 입력을 매칭하기 위한 힌트.
+ * 한국어 법률 실무에서 흔히 쓰이는 비공식 용어와 도구를 연결.
+ *
+ * 예시: "조세심판원" → search_tax_tribunal_decisions
+ *       "김영란법" → search_law (약칭은 search-normalizer가 처리)
+ *       "하자" → search_precedents (민사 분쟁 키워드)
  */
-const LITE_TOOLS = new Set([
-  // 체인 도구 — 80%+ 유스케이스 커버
-  "chain_full_research",
-  "chain_law_system",
-  "chain_action_basis",
-  "chain_dispute_prep",
-  "chain_amendment_track",
-  "chain_ordinance_compare",
-  "chain_procedure_detail",
-  "chain_document_review",
-  // 핵심 직접 도구 — 단순 조회
-  "search_law",
-  "get_law_text",
-  "search_precedents",
-  "get_precedent_text",
-  // 메타 도구 — 나머지 73개 접근용
-  "discover_tools",
-  "execute_tool",
-])
+export const TOOL_ALIASES: Record<string, string[]> = {
+  // 카테고리명 별칭
+  "조세심판": ["조세심판원", "세금심판", "세금 이의", "조세불복", "조세심판례"],
+  "관세": ["관세청", "통관", "FTA", "원산지", "관세해석", "수출입"],
+  "헌재": ["헌법재판소", "위헌법률심판", "헌법소원", "헌재결정"],
+  "행정심판": ["행심", "행정심판례", "행심판례", "취소재결"],
+  "공정위": ["공정거래위원회", "공정거래", "독점규제", "담합", "공정거래법"],
+  "개인정보위": ["개인정보보호위원회", "개인정보보호", "개인정보침해", "PIPC"],
+  "노동위": ["중앙노동위원회", "지방노동위원회", "부당해고", "부당노동행위", "NLRC"],
+  "권익위": ["국민권익위원회", "반부패", "청탁금지법", "ACR"],
+  "소청심사": ["소청심사위원회", "공무원 징계 불복", "파면 불복", "해임 불복"],
+  "학칙": ["대학 학칙", "고등학교 학칙", "교칙", "학사규정"],
+  "공사공단": ["지방공사", "지방공단", "지방공기업"],
+  "공공기관": ["공공기관 규정", "공기업 규정", "공공기관 내규"],
+  "조약": ["국제조약", "양자조약", "다자조약", "협정", "treaty"],
+  "영문법령": ["영문 법률", "영어 법령", "English law", "영문 조문"],
+  "자치법규": ["조례", "규칙", "지자체 법규", "시 조례", "구 조례", "도 조례"],
+  "별표서식": ["별표", "서식", "별지", "양식", "신청서"],
+  "용어": ["법률용어", "법령용어", "용어 정의", "법적 용어", "법률 사전"],
+  "판례": ["대법원", "판결문", "판례검색", "대법원 판례"],
+  "해석례": ["법제처 해석", "유권해석", "질의회신"],
+  // 도구 의도 별칭
+  "인용검증": ["verify_citations", "조문 실존 확인", "환각 검증"],
+  "문서검토": ["analyze_document", "chain_document_review", "계약서 검토", "약관 검토"],
+  "처분기준": ["chain_action_basis", "과태료 기준", "과징금 기준", "영업정지 기간"],
+  "절차매뉴얼": ["chain_procedure_detail", "처리 절차", "신청 방법", "수수료"],
+}
 
 /** 도구 카테고리 매핑 (discover_tools용) */
 export const TOOL_CATEGORIES: Record<string, string[]> = {
@@ -69,14 +75,3 @@ export const TOOL_CATEGORIES: Record<string, string[]> = {
   "유틸리티": ["parse_jo_code", "get_law_abbreviations"],
 }
 
-/** 프로필 파싱 (잘못된 값이면 full) */
-export function parseProfile(value: string | undefined): ToolProfile {
-  if (value === "lite") return "lite"
-  return "full"
-}
-
-/** 프로필에 맞는 도구 필터링 */
-export function filterToolsByProfile(tools: McpTool[], profile: ToolProfile): McpTool[] {
-  if (profile === "full") return tools
-  return tools.filter(t => LITE_TOOLS.has(t.name))
-}

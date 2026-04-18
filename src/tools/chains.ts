@@ -5,10 +5,16 @@
 import { z } from "zod"
 import { truncateSections } from "../lib/schemas.js"
 import { formatToolError } from "../lib/errors.js"
-import { extractTag } from "../lib/xml-parser.js"
-import { lawCache } from "../lib/cache.js"
 import type { LawApiClient } from "../lib/api-client.js"
 import type { ToolResponse, LooseToolResponse } from "../lib/types.js"
+import {
+  findLaws,
+  stripNonLawKeywords as _unused1,
+  NON_LAW_NAME_RE,
+  type LawInfo,
+} from "../lib/law-search.js"
+// chains.ts 내부 헬퍼가 참조하던 NON_LAW_NAME_RE만 유지 (stripNonLawKeywords는 findLaws 내부에서 사용)
+void _unused1
 import { runScenario, detectScenario, formatSections, formatSuggestedActions } from "./scenarios/index.js"
 import type { ScenarioType, ScenarioContext } from "./scenarios/index.js"
 
@@ -33,13 +39,6 @@ import { searchNlrcDecisions, searchPipcDecisions } from "./committee-decisions.
 // ========================================
 // Types
 // ========================================
-
-interface LawInfo {
-  lawName: string
-  lawId: string
-  mst: string
-  lawType: string
-}
 
 interface CallResult {
   text: string
@@ -66,117 +65,6 @@ async function callTool(
   } catch (e) {
     return { text: `오류: ${e instanceof Error ? e.message : String(e)}`, isError: true }
   }
-}
-
-/** 법령명이 아닌 부가 키워드 제거 (법제처 lawSearch API는 법령명 검색이므로) */
-const NON_LAW_NAME_RE = /\s*(과태료|절차|비용|처벌|기준|허가|신청|부과|근거|위반|방법|요건|조건|처분|수수료|신고|등록|면허|인가|승인|취소|정지|벌칙|벌금|과징금|이행강제금|시정명령|체계|구조|3단|판례|해석|개정|별표|시행령|시행규칙|서식|수입|수출|통관|반환|납부|감면|면제|제한|금지|의무|권리|자격|종류|기간|대상|범위|적용|감경|영향도|영향|분석|위임입법|위임|현황|미이행|미제정|시계열|타임라인|변화|처리|민원|매뉴얼|업무|담당|적합성|상위법|저촉|검증|파급|연쇄|불복|소송|쟁송|FTA|원산지|HS코드|품목분류|관세사)\s*/g
-
-function stripNonLawKeywords(query: string): string {
-  return query.replace(NON_LAW_NAME_RE, " ").trim()
-}
-
-/** XML에서 법령 정보 파싱 */
-function parseLawXml(xmlText: string, max: number): LawInfo[] {
-  const lawRegex = /<law[^>]*>([\s\S]*?)<\/law>/g
-  const results: LawInfo[] = []
-  let match
-  while ((match = lawRegex.exec(xmlText)) !== null && results.length < max) {
-    const content = match[1]
-    const lawName = extractTag(content, "법령명한글")
-    if (!lawName) continue // 빈 법령명 제외
-    results.push({
-      lawName,
-      lawId: extractTag(content, "법령ID"),
-      mst: extractTag(content, "법령일련번호"),
-      lawType: extractTag(content, "법령구분명"),
-    })
-  }
-  return results
-}
-
-async function findLaws(
-  apiClient: LawApiClient,
-  query: string,
-  apiKey?: string,
-  max = 3
-): Promise<LawInfo[]> {
-  // 캐시 확인 (검색어 기반, 1시간 TTL)
-  const cacheKey = `chain-search:${query}:${max}`
-  const cached = lawCache.get<LawInfo[]>(cacheKey)
-  if (cached) return cached.slice(0, max)
-
-  // 1차: 원본 쿼리로 검색
-  let results: LawInfo[] = []
-  try {
-    const xmlText = await apiClient.searchLaw(query, apiKey)
-    results = parseLawXml(xmlText, max)
-  } catch (e) {
-    // 인증/권한 에러는 재시도 무의미 — 즉시 전파
-    if (e instanceof Error && /429|401|403|API 키/.test(e.message)) throw e
-    /* 그 외 에러: 2차 시도로 진행 */
-  }
-
-  // 2차: 결과 없으면 부가 키워드 제거 후 재시도
-  if (results.length === 0) {
-    const stripped = stripNonLawKeywords(query)
-    if (stripped && stripped !== query) {
-      try {
-        const xmlText = await apiClient.searchLaw(stripped, apiKey)
-        results = parseLawXml(xmlText, max)
-      } catch (e) {
-        if (e instanceof Error && /429|401|403|API 키/.test(e.message)) throw e
-      }
-    }
-  }
-
-  // 3차: 법령명 패턴 직접 추출 (strip이 법령명을 파괴하는 경우 대비)
-  // 예: "근로기준법 개정이력" → strip이 "기준" 제거 → "근로 법" 실패 → 패턴으로 "근로기준법" 추출
-  if (results.length === 0) {
-    const lawNameMatch = query.match(/[가-힣]+(법|시행령|시행규칙|규칙|규정|령)(?:\s|$)/)
-    if (lawNameMatch) {
-      const extracted = lawNameMatch[0].trim()
-      try {
-        const xmlText = await apiClient.searchLaw(extracted, apiKey)
-        results = parseLawXml(xmlText, max)
-      } catch (e) {
-        if (e instanceof Error && /429|401|403|API 키/.test(e.message)) throw e
-      }
-    }
-  }
-
-  // 쿼리와 법령명 관련도 기반 정렬 (정확 매칭 > 부분 매칭 > 나머지)
-  if (results.length > 1) {
-    const queryWords = query.replace(NON_LAW_NAME_RE, " ")
-      .trim().split(/\s+/).filter(w => w.length > 0)
-    results.sort((a, b) => {
-      const scoreA = scoreLawRelevance(a.lawName, query, queryWords)
-      const scoreB = scoreLawRelevance(b.lawName, query, queryWords)
-      return scoreB - scoreA
-    })
-  }
-
-  // 캐시 저장 (1시간 TTL)
-  if (results.length > 0) {
-    lawCache.set(cacheKey, results, 60 * 60 * 1000)
-  }
-
-  return results
-}
-
-/** 쿼리 대비 법령명 관련도 점수 (높을수록 관련) */
-function scoreLawRelevance(lawName: string, query: string, queryWords: string[]): number {
-  let score = 0
-  // 정확 매칭: 쿼리가 법령명을 포함
-  if (query.includes(lawName)) score += 100
-  // 법령명이 쿼리를 포함
-  if (lawName.includes(query.replace(/\s+/g, ""))) score += 80
-  // 단어 매칭
-  for (const w of queryWords) {
-    if (lawName.includes(w)) score += 10
-  }
-  // 법률 > 시행령 > 시행규칙 우선순위
-  if (!/시행령|시행규칙/.test(lawName)) score += 5
-  return score
 }
 
 function detectExpansions(query: string): ExpansionType[] {
@@ -214,19 +102,22 @@ function sec(title: string, content: string): string {
   return `\n▶ ${title}\n${content}\n`
 }
 
-/** 부분 실패 시 사용자에게 왜 빠졌는지 알림 */
+/** 부분 실패 시 사용자에게 왜 빠졌는지 알림 — LLM 환각 방지용 명시적 NOT_FOUND 마커 */
 function secOrSkip(title: string, result: CallResult): string {
   if (!result.isError) return sec(title, result.text)
-  // 에러인 경우 간략하게 왜 빠졌는지 표시
+  // 에러인 경우 왜 빠졌는지 표시 (200자까지 노출, LLM이 원인 파악 가능하게)
   if (result.text && result.text.trim()) {
-    return `\n▶ ${title} (조회 실패: ${result.text.slice(0, 80)})\n`
+    const snippet = result.text.length > 200 ? result.text.slice(0, 200) + "..." : result.text
+    return `\n▶ ${title} [NOT_FOUND / FAILED]\n   ⚠️ 이 섹션은 조회 실패 — LLM은 내용을 추측/생성하지 마세요.\n   사유: ${snippet}\n`
   }
-  return `\n▶ ${title} (조회 실패)\n`
+  return `\n▶ ${title} [NOT_FOUND / FAILED]\n   ⚠️ 이 섹션은 조회 실패 — LLM은 내용을 추측/생성하지 마세요.\n`
 }
 
 function noResult(query: string): ToolResponse {
   const keywords = query.trim().split(/\s+/)
-  const lines = [`'${query}' 관련 법령을 찾을 수 없습니다.`]
+  const lines = [`[NOT_FOUND] '${query}' 관련 법령을 찾을 수 없습니다.`]
+  lines.push("")
+  lines.push("⚠️ 이 체인은 기반 법령을 찾지 못해 실행을 중단했습니다. LLM은 법령·조문·판례를 추측/생성하지 마세요. 사용자에게 '검색 실패'를 명시 보고하세요.")
   if (keywords.length >= 2) {
     lines.push("")
     lines.push("힌트: 법제처 API는 공백 구분 키워드를 AND 조건으로 처리합니다. 키워드가 많을수록 결과가 줄어듭니다.")
@@ -280,7 +171,7 @@ export async function chainLawSystem(
 
     // 3단 비교
     const threeTier = await callTool(getThreeTier, apiClient, { mst: p.mst, apiKey: input.apiKey })
-    if (!threeTier.isError) parts.push(sec("3단 비교 (법률·시행령·시행규칙)", threeTier.text))
+    parts.push(secOrSkip("3단 비교 (법률·시행령·시행규칙)", threeTier))
 
     // 조문 조회
     if (input.articles?.length) {
@@ -289,14 +180,14 @@ export async function chainLawSystem(
         articles: input.articles,
         apiKey: input.apiKey,
       })
-      if (!batch.isError) parts.push(sec("핵심 조문", batch.text))
+      parts.push(secOrSkip("핵심 조문", batch))
     }
 
     // 키워드 확장: 별표
     const exp = detectExpansions(input.query)
     if (exp.includes("annex_fee") || exp.includes("annex_table") || exp.includes("annex_form")) {
       const annexes = await callTool(getAnnexes, apiClient, { lawName: p.lawName, apiKey: input.apiKey })
-      if (!annexes.isError) parts.push(sec("별표/서식", annexes.text))
+      parts.push(secOrSkip("별표/서식", annexes))
     }
 
     // Scenario 확장
@@ -357,7 +248,7 @@ export async function chainActionBasis(
     const exp = detectExpansions(input.query)
     if (exp.includes("annex_fee") || exp.includes("annex_table")) {
       const annexes = await callTool(getAnnexes, apiClient, { lawName: p.lawName, apiKey: input.apiKey })
-      if (!annexes.isError) parts.push(sec("별표 (과태료/기준표)", annexes.text))
+      parts.push(secOrSkip("별표 (과태료/기준표)", annexes))
     }
 
     // Scenario 확장
@@ -411,22 +302,22 @@ export async function chainDisputePrep(
 
     const results = await Promise.all(parallel)
 
-    if (!results[0].isError) parts.push(sec("대법원 판례", results[0].text))
-    if (!results[1].isError) parts.push(sec("행정심판례", results[1].text))
-    if (results[2] && !results[2].isError) {
+    parts.push(secOrSkip("대법원 판례", results[0]))
+    parts.push(secOrSkip("행정심판례", results[1]))
+    if (results[2]) {
       const domainNames: Record<string, string> = {
         tax: "조세심판원 결정",
         labor: "중앙노동위 결정",
         privacy: "개인정보위 결정",
       }
-      parts.push(sec(domainNames[domain] || "전문 결정례", results[2].text))
+      parts.push(secOrSkip(domainNames[domain] || "전문 결정례", results[2]))
     }
 
     // 해석례 (키워드 확장)
     const exp = detectExpansions(input.query)
     if (exp.includes("interpretation")) {
       const interp = await callTool(searchInterpretations, apiClient, { query: input.query, display: 5, apiKey: input.apiKey })
-      if (!interp.isError) parts.push(sec("법령 해석례", interp.text))
+      parts.push(secOrSkip("법령 해석례", interp))
     }
 
     return wrapResult(parts.join("\n"))
@@ -471,16 +362,12 @@ export async function chainAmendmentTrack(
 
     // Step 1: 신구대조표
     const oldNew = await callTool(compareOldNew, apiClient, { ...id, apiKey: input.apiKey })
-    if (!oldNew.isError) {
-      parts.push(sec("신구대조표 (최근 개정)", oldNew.text))
-    }
+    parts.push(secOrSkip("신구대조표 (최근 개정)", oldNew))
 
     // Step 2: 조문별 개정 이력 (lawId 필요)
     if (lawId) {
       const artHistory = await callTool(getArticleHistory, apiClient, { lawId, apiKey: input.apiKey })
-      if (!artHistory.isError) {
-        parts.push(sec("조문별 개정 이력", artHistory.text))
-      }
+      parts.push(secOrSkip("조문별 개정 이력", artHistory))
     }
 
     // Scenario 확장
@@ -528,13 +415,13 @@ export async function chainOrdinanceCompare(
 
       // 3단 비교 (위임 근거 확인)
       const threeTier = await callTool(getThreeTier, apiClient, { mst: p.mst, apiKey: input.apiKey })
-      if (!threeTier.isError) parts.push(sec("위임 체계 (법률·시행령·시행규칙)", threeTier.text))
+      parts.push(secOrSkip("위임 체계 (법률·시행령·시행규칙)", threeTier))
     }
 
     // Step 2: 조례 검색 — "조례"/"규칙" 제거 (이미 조례 DB에서 검색하므로)
     const ordinanceQuery = input.query.replace(/\s*(조례|규칙|자치법규)\s*/g, " ").trim() || input.query
     const ordinances = await callTool(searchOrdinance, apiClient, { query: ordinanceQuery, display: 20, apiKey: input.apiKey })
-    if (!ordinances.isError) parts.push(sec("전국 자치법규 검색 결과", ordinances.text))
+    parts.push(secOrSkip("전국 자치법규 검색 결과", ordinances))
 
     // Step 3: 상위 1건 전문 자동 조회
     if (!ordinances.isError) {
@@ -542,7 +429,7 @@ export async function chainOrdinanceCompare(
       const seqMatch = ordinances.text.match(/\[(\d{5,})\]/)
       if (seqMatch) {
         const fullText = await callTool(getOrdinance, apiClient, { ordinSeq: seqMatch[1], apiKey: input.apiKey })
-        if (!fullText.isError) parts.push(sec("조례 전문 (상위 1건)", fullText.text))
+        parts.push(secOrSkip("조례 전문 (상위 1건)", fullText))
       }
     }
 
@@ -550,7 +437,7 @@ export async function chainOrdinanceCompare(
     const exp = detectExpansions(input.query)
     if (exp.includes("interpretation")) {
       const interp = await callTool(searchInterpretations, apiClient, { query: input.query, display: 5, apiKey: input.apiKey })
-      if (!interp.isError) parts.push(sec("법령 해석례", interp.text))
+      parts.push(secOrSkip("법령 해석례", interp))
     }
 
     // Scenario 확장
@@ -617,7 +504,7 @@ export async function chainFullResearch(
     if (lawsResult.length > 0) {
       if (exp.includes("annex_fee") || exp.includes("annex_table") || exp.includes("annex_form")) {
         const annexes = await callTool(getAnnexes, apiClient, { lawName: lawsResult[0].lawName, apiKey: input.apiKey })
-        if (!annexes.isError) parts.push(sec("별표/서식", annexes.text))
+        parts.push(secOrSkip("별표/서식", annexes))
       }
     }
 
@@ -664,7 +551,7 @@ export async function chainProcedureDetail(
 
     // Step 2: 3단 비교 (절차 체계 파악)
     const threeTier = await callTool(getThreeTier, apiClient, { mst: p.mst, apiKey: input.apiKey })
-    if (!threeTier.isError) parts.push(sec("법령 체계 (절차 근거)", threeTier.text))
+    parts.push(secOrSkip("법령 체계 (절차 근거)", threeTier))
 
     // Step 3: 별표(수수료/과태료) + 서식(신청서) 병렬
     const [annexFee, annexForm] = await Promise.all([
@@ -685,12 +572,12 @@ export async function chainProcedureDetail(
       })(),
     ])
 
-    if (!annexFee.isError) parts.push(sec(`${p.lawName} 별표/서식`, annexFee.text))
-    if (!annexForm.isError && annexForm.text) parts.push(sec("시행규칙 별표/서식", annexForm.text))
+    parts.push(secOrSkip(`${p.lawName} 별표/서식`, annexFee))
+    if (annexForm.text || annexForm.isError) parts.push(secOrSkip("시행규칙 별표/서식", annexForm))
 
     // Step 4: AI 검색으로 보완 (절차 상세)
     const aiResult = await callTool(searchAiLaw, apiClient, { query: input.query, display: 5, apiKey: input.apiKey })
-    if (!aiResult.isError) parts.push(sec("AI 검색 보완 정보", aiResult.text))
+    parts.push(secOrSkip("AI 검색 보완 정보", aiResult))
 
     // Scenario 확장
     const scenario = (input.scenario || detectScenario(input.query, "chain_procedure_detail")) as ScenarioType | null
