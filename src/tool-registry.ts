@@ -57,6 +57,7 @@ import { getLawSystemTree, getLawSystemTreeSchema } from "./tools/law-system-tre
 import { getLinkedOrdinances, LinkedOrdinancesSchema, getLinkedOrdinanceArticles, LinkedOrdinanceArticlesSchema, getDelegatedLaws, DelegatedLawsSchema, getLinkedLawsFromOrdinance, LinkedLawsFromOrdinanceSchema } from "./tools/law-linkage.js"
 import { analyzeDocument, AnalyzeDocumentSchema } from "./tools/document-analysis.js"
 import { verifyCitations, VerifyCitationsSchema } from "./tools/verify-citations.js"
+import { impactMap, ImpactMapSchema } from "./tools/impact-map.js"
 // Chain tool imports
 import {
   chainLawSystem, chainLawSystemSchema,
@@ -647,6 +648,14 @@ export const allTools: McpTool[] = [
     handler: verifyCitations
   },
 
+  // === 영향 그래프 (v4.0 killer feature) ===
+  {
+    name: "impact_map",
+    description: "[영향그래프] 조문 한 줄의 파급효과 그래프. 특정 조문(예: 민법 제103조)을 인용한 모든 판례·헌재·해석례·행심·자치법규를 역방향 탐색 + 그 조문이 인용한 다른 법령(정방향) + mermaid 시각화. lawName + jo 필수. 다른 chain은 query 단방향이지만 이 도구는 '한 조문 → 영향받는 모든 곳' 역방향.",
+    schema: ImpactMapSchema,
+    handler: impactMap
+  },
+
   // === 메타 도구 (lite 프로필용) ===
   {
     name: "discover_tools",
@@ -664,13 +673,13 @@ export const allTools: McpTool[] = [
   // === 통합 도구 (v3) ===
   {
     name: "search_decisions",
-    description: "[통합검색] 17개 도메인(판례·해석례·헌재·행심·조세심판·관세·공정위·개인정보위·노동위·권익위·소청심사·학칙·공사공단·공공기관·조약·영문법령) 통합 검색. domain으로 선택",
+    description: "[통합검색] 18개 도메인(판례·해석례·헌재·행심·조세심판·관세·국세청·공정위·개인정보위·노동위·권익위·소청심사·학칙·공사공단·공공기관·조약·영문법령) 통합 검색. domain으로 선택. 세무 관련 국세청 직접 회신 해석은 domain='nts'.",
     schema: SearchDecisionsSchema,
     handler: searchDecisions
   },
   {
     name: "get_decision_text",
-    description: "[통합조회] 17개 도메인 전문 조회. domain+id. full=false(기본) 시 본문 계단식 축약",
+    description: "[통합조회] 18개 도메인 전문 조회. domain+id. full=false(기본) 시 본문 계단식 축약",
     schema: GetDecisionTextSchema,
     handler: getDecisionText
   },
@@ -719,7 +728,8 @@ const V3_EXPOSED = new Set([
   "get_annexes",
   "search_decisions", "get_decision_text",
   "discover_tools", "execute_tool",
-  "verify_citations",  // v3.5: LLM 환각 방지 인용 검증 (killer feature)
+  "verify_citations",  // v3.5: LLM 환각 방지 인용 검증
+  "impact_map",        // v4.0: 조문 영향 그래프 (역방향 탐색 + mermaid)
 ])
 
 // 이름 기반 O(1) 조회용 Map

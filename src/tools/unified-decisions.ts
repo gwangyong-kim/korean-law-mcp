@@ -16,7 +16,10 @@ import { compactLongSections } from "../lib/decision-compact.js"
 import { searchPrecedents, getPrecedentText } from "./precedents.js"
 import { searchInterpretations, getInterpretationText } from "./interpretations.js"
 import { searchTaxTribunalDecisions, getTaxTribunalDecisionText } from "./tax-tribunal-decisions.js"
-import { searchCustomsInterpretations, getCustomsInterpretationText } from "./customs-interpretations.js"
+import {
+  searchCustomsInterpretations, getCustomsInterpretationText,
+  searchNtsInterpretations, getNtsInterpretationText,
+} from "./customs-interpretations.js"
 import { searchConstitutionalDecisions, getConstitutionalDecisionText } from "./constitutional-decisions.js"
 import { searchAdminAppeals, getAdminAppealText } from "./admin-appeals.js"
 import {
@@ -38,7 +41,7 @@ import { searchEnglishLaw, getEnglishLawText } from "./english-law.js"
 // ========================================
 
 const DOMAINS = [
-  "precedent", "interpretation", "tax_tribunal", "customs",
+  "precedent", "interpretation", "tax_tribunal", "customs", "nts",
   "constitutional", "admin_appeal", "ftc", "pipc", "nlrc", "acr",
   "appeal_review", "acr_special",
   "school", "public_corp", "public_inst",
@@ -52,6 +55,7 @@ const DOMAIN_LABELS: Record<Domain, string> = {
   interpretation: "해석례",
   tax_tribunal: "조세심판원 재결례",
   customs: "관세청 법령해석",
+  nts: "국세청 법령해석",
   constitutional: "헌재 결정례",
   admin_appeal: "행정심판례",
   ftc: "공정위 결정문",
@@ -73,6 +77,7 @@ const SEARCH_HANDLERS: Record<Domain, (api: LawApiClient, args: any) => Promise<
   interpretation: searchInterpretations,
   tax_tribunal: searchTaxTribunalDecisions,
   customs: searchCustomsInterpretations,
+  nts: searchNtsInterpretations,
   constitutional: searchConstitutionalDecisions,
   admin_appeal: searchAdminAppeals,
   ftc: searchFtcDecisions,
@@ -100,6 +105,7 @@ const GET_HANDLERS: Record<Domain, (api: LawApiClient, args: any) => Promise<Loo
   interpretation: getInterpretationText,
   tax_tribunal: getTaxTribunalDecisionText,
   customs: getCustomsInterpretationText,
+  nts: getNtsInterpretationText,
   constitutional: getConstitutionalDecisionText,
   admin_appeal: getAdminAppealText,
   ftc: getFtcDecisionText,
