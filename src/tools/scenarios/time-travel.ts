@@ -10,7 +10,7 @@
  *   3. 추가(+) / 삭제(-) / 변경(△) 조문 분류 출력
  */
 import type { ScenarioContext, ScenarioResult, ScenarioSection } from "./types.js"
-import { fetchHistoricalVersionsRaw, type HistoricalVersion } from "../../lib/historical-utils.js"
+import { fetchHistoricalVersionsFull, type HistoricalVersion } from "../../lib/historical-utils.js"
 
 interface ArticleSnapshot {
   joNum: string
@@ -145,10 +145,15 @@ export async function runTimeTravelScenario(ctx: ScenarioContext): Promise<Scena
     return { sections, suggestedActions }
   }
 
-  // Step 1: 연혁 목록 → 두 시점 MST 결정
+  // Step 1: 연혁 목록 → 두 시점 MST 결정 (페이징으로 전체 회수)
   let versions: HistoricalVersion[] = []
+  let totalCount = 0
+  let fetchedPages = 0
   try {
-    versions = await fetchHistoricalVersionsRaw(ctx.apiClient, lawName, ctx.apiKey)
+    const r = await fetchHistoricalVersionsFull(ctx.apiClient, lawName, ctx.apiKey)
+    versions = r.versions
+    totalCount = r.totalCount
+    fetchedPages = r.fetchedPages
   } catch (e) {
     sections.push({
       title: "Time Travel — 시점 비교 (v4.0)",
@@ -160,7 +165,7 @@ export async function runTimeTravelScenario(ctx: ScenarioContext): Promise<Scena
   if (versions.length === 0) {
     sections.push({
       title: "Time Travel — 시점 비교 (v4.0)",
-      content: `[NOT_FOUND] '${lawName}' 연혁을 찾을 수 없습니다. 법령명을 확인하세요.`,
+      content: `[NOT_FOUND] '${lawName}' 연혁을 찾을 수 없습니다. 법령명 띄어쓰기/오타를 확인하세요.\n참고: 법제처 응답 총 ${totalCount}건 (정확매칭 0건). 입력 법령명이 lsHistory의 '법령명한글'과 정확히 일치해야 합니다 (공백 제거 비교).`,
     })
     return { sections, suggestedActions }
   }
@@ -170,9 +175,17 @@ export async function runTimeTravelScenario(ctx: ScenarioContext): Promise<Scena
 
   if (!oldVer || !newVer) {
     const earliest = versions[versions.length - 1]
+    const latest = versions[0]
+    const lines = [
+      `[NOT_FOUND] 시점 매칭 실패.`,
+      `연혁 범위: ${earliest?.efYd || "?"} ~ ${latest?.efYd || "?"} (정확매칭 ${versions.length}개 / 법제처 총 ${totalCount}건, ${fetchedPages}페이지 수집)`,
+      `입력: fromDate=${fromDate}, toDate=${toDate}`,
+      !oldVer ? `→ fromDate(${fromDate})가 가장 오래된 연혁(${earliest?.efYd})보다 이전입니다. 그 시점 이후로 조정하세요.` : "",
+      !newVer ? `→ toDate(${toDate})가 가장 오래된 연혁(${earliest?.efYd})보다 이전입니다.` : "",
+    ].filter(Boolean)
     sections.push({
       title: "Time Travel — 시점 비교 (v4.0)",
-      content: `[NOT_FOUND] 시점 매칭 실패. 가장 오래된 연혁: ${earliest?.efYd || "?"}, 입력: ${fromDate}~${toDate}`,
+      content: lines.join("\n"),
     })
     return { sections, suggestedActions }
   }
@@ -204,7 +217,15 @@ export async function runTimeTravelScenario(ctx: ScenarioContext): Promise<Scena
   } catch (e) {
     sections.push({
       title: "Time Travel — 시점 비교 (v4.0)",
-      content: `⚠️ 본문 조회 실패: ${e instanceof Error ? e.message : String(e)}`,
+      content: `⚠️ 본문 조회 실패 (시점 A MST=${oldVer.mst} ${oldVer.efYd} / 시점 B MST=${newVer.mst} ${newVer.efYd}): ${e instanceof Error ? e.message : String(e)}`,
+    })
+    return { sections, suggestedActions }
+  }
+
+  if (oldArticles.length === 0 || newArticles.length === 0) {
+    sections.push({
+      title: "Time Travel — 시점 비교 (v4.0)",
+      content: `[NOT_FOUND] 본문 조문 추출 실패. 시점 A MST=${oldVer.mst}(${oldVer.efYd}) ${oldArticles.length}개 / 시점 B MST=${newVer.mst}(${newVer.efYd}) ${newArticles.length}개.\n→ 해당 MST의 lawService.do 응답에 조문이 없거나 응답 구조가 비표준일 수 있습니다.`,
     })
     return { sections, suggestedActions }
   }
@@ -213,9 +234,13 @@ export async function runTimeTravelScenario(ctx: ScenarioContext): Promise<Scena
   const { added, removed, modified } = diffArticles(oldArticles, newArticles)
 
   // Step 4: 출력
+  const versionsInfo = totalCount > versions.length
+    ? `연혁 ${versions.length}/${totalCount}개 수집(${fetchedPages}p)`
+    : `연혁 ${versions.length}개 수집`
   const header =
     `시점 A: ${oldVer.efYd} 시행 (MST ${oldVer.mst}, ${oldArticles.length}개 조문)\n` +
     `시점 B: ${newVer.efYd} 시행 (MST ${newVer.mst}, ${newArticles.length}개 조문)\n` +
+    `${versionsInfo}\n` +
     `요약: + ${added.length} 신설 | - ${removed.length} 삭제 | △ ${modified.length} 변경`
 
   let body = header

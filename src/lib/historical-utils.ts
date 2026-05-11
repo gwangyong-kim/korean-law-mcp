@@ -13,32 +13,17 @@ export interface HistoricalVersion {
   rrCls: string
 }
 
-/** lsHistory API 호출 → HTML 파싱 → 시행일 내림차순 */
-export async function fetchHistoricalVersionsRaw(
-  apiClient: LawApiClient,
-  lawName: string,
-  apiKey?: string,
-  display = 100
-): Promise<HistoricalVersion[]> {
-  const html = await apiClient.fetchApi({
-    endpoint: "lawSearch.do",
-    target: "lsHistory",
-    type: "HTML",
-    extraParams: {
-      query: lawName,
-      display: String(display),
-      sort: "efdes",
-    },
-    apiKey,
-  })
+export interface HistoricalFetchResult {
+  versions: HistoricalVersion[]
+  totalCount: number   // 법제처 응답 "총 N건"
+  fetchedPages: number
+}
 
-  const histories: HistoricalVersion[] = []
-  const rowPattern = /<tr[^>]*>[\s\S]*?<\/tr>/gi
-  const rows = html.match(rowPattern) || []
+const ROW_PATTERN = /<tr[^>]*>[\s\S]*?<\/tr>/gi
 
-  const normalizedTarget = lawName.replace(/\s/g, "")
-  const targetHasDecree = lawName.includes("시행령") || lawName.includes("시행규칙")
-
+function parseHistoryRows(html: string, normalizedTarget: string, targetHasDecree: boolean): HistoricalVersion[] {
+  const out: HistoricalVersion[] = []
+  const rows = html.match(ROW_PATTERN) || []
   for (const row of rows) {
     const linkMatch = row.match(/MST=(\d+)[^"]*efYd=(\d*)/)
     if (!linkMatch) continue
@@ -49,7 +34,6 @@ export async function fetchHistoricalVersionsRaw(
     const lawNm = lawNmMatch?.[1]?.trim() || ""
     if (!lawNm) continue
 
-    // 시행령/시행규칙 필터
     const lawHasDecree = lawNm.includes("시행령") || lawNm.includes("시행규칙")
     if (!targetHasDecree && lawHasDecree) continue
 
@@ -69,9 +53,81 @@ export async function fetchHistoricalVersionsRaw(
     const rrClsMatch = row.match(/(제정|일부개정|전부개정|폐지|타법개정|타법폐지|일괄개정|일괄폐지)/)
     const rrCls = rrClsMatch?.[1] || ""
 
-    histories.push({ mst, efYd, ancNo, ancYd, lawNm, rrCls })
+    out.push({ mst, efYd, ancNo, ancYd, lawNm, rrCls })
+  }
+  return out
+}
+
+function parseTotalCount(html: string): number {
+  const m = html.match(/<strong>(\d+)<\/strong>\s*건/)
+  return m ? parseInt(m[1], 10) : 0
+}
+
+/**
+ * lsHistory API 호출 → HTML 파싱 → 시행일 내림차순
+ * 자주 개정되는 법령(소득세법 시행령 등 200+ 건)도 페이징으로 전체 회수.
+ */
+export async function fetchHistoricalVersionsFull(
+  apiClient: LawApiClient,
+  lawName: string,
+  apiKey?: string,
+  pageSize = 500
+): Promise<HistoricalFetchResult> {
+  const normalizedTarget = lawName.replace(/\s/g, "")
+  const targetHasDecree = lawName.includes("시행령") || lawName.includes("시행규칙")
+
+  const allVersions: HistoricalVersion[] = []
+  let totalCount = 0
+  let fetchedPages = 0
+  let page = 1
+
+  while (page <= 20) {  // 안전 상한: 페이지당 500 × 20 = 10,000개
+    const html = await apiClient.fetchApi({
+      endpoint: "lawSearch.do",
+      target: "lsHistory",
+      type: "HTML",
+      extraParams: {
+        query: lawName,
+        display: String(pageSize),
+        sort: "efdes",
+        page: String(page),
+      },
+      apiKey,
+    })
+
+    if (page === 1) totalCount = parseTotalCount(html)
+    const pageRows = parseHistoryRows(html, normalizedTarget, targetHasDecree)
+    fetchedPages = page
+
+    if (pageRows.length === 0) break
+    allVersions.push(...pageRows)
+
+    // 첫 페이지에 totalCount 다 들어왔으면 종료
+    if (totalCount > 0 && allVersions.length >= totalCount) break
+    // pageSize보다 적게 왔으면 끝
+    if (pageRows.length < pageSize) break
+    page++
   }
 
-  histories.sort((a, b) => parseInt(b.efYd || "0", 10) - parseInt(a.efYd || "0", 10))
-  return histories
+  // 중복 제거 (MST 기준 — 페이징 경계 안전망)
+  const seen = new Set<string>()
+  const unique = allVersions.filter(v => {
+    if (seen.has(v.mst)) return false
+    seen.add(v.mst)
+    return true
+  })
+
+  unique.sort((a, b) => parseInt(b.efYd || "0", 10) - parseInt(a.efYd || "0", 10))
+  return { versions: unique, totalCount, fetchedPages }
+}
+
+/** @deprecated Use fetchHistoricalVersionsFull. 단일 페이지(legacy 호환용). */
+export async function fetchHistoricalVersionsRaw(
+  apiClient: LawApiClient,
+  lawName: string,
+  apiKey?: string,
+  display = 500
+): Promise<HistoricalVersion[]> {
+  const r = await fetchHistoricalVersionsFull(apiClient, lawName, apiKey, display)
+  return r.versions
 }
