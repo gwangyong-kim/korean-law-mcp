@@ -199,7 +199,7 @@ async function printBanner(): Promise<void> {
   }
   console.log()
 
-  const tagline = "  MCP Server v3  ━━  법제처 41개 API → 14개 도구"
+  const tagline = "  MCP Server v4  ━━  법제처 42개 API → 17개 도구"
   await typewrite(`${c.dim}${tagline}${c.reset}`, 12)
   console.log()
 

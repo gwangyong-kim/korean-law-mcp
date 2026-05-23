@@ -568,7 +568,7 @@ export async function chainOrdinanceCompare(
 export const chainFullResearchSchema = z.object({
   query: z.string().describe("자연어 질문 (예: '기간제 근로자 2년 초과 사용', '음주운전 처벌 기준', '전세금 못 받았어')"),
   scenario: z.enum(["customs", "action_plan"]).optional()
-    .describe("확장 시나리오. customs=관세·통관 종합 | action_plan=시민 친화 5단계 실행 가이드(v4.0, 진단→권리→기관/기한→서류→함정). 미지정 시 쿼리에서 자동 감지."),
+    .describe("확장 시나리오. customs=관세·통관 종합 | action_plan=이럴 땐 이렇게, 5단계 안내(v4.0, 진단→권리→기관/기한→서류→함정). 미지정 시 쿼리에서 자동 감지."),
   apiKey: z.string().optional(),
 })
 
