@@ -49,6 +49,10 @@ graph LR
 
 → STEP 1 상황진단(주택임대차보호법 자동 식별) → STEP 2 권리/구제수단(판례) → STEP 3 신청기관/기한(행정규칙+해석) → STEP 4 필요서류/양식(별표) → STEP 5 함정/주의(시효·법률구조공단). 평소 말투 그대로 → 실행 가능한 단계로 변환.
 
+### + v4.0.5 — 의존성 취약점 일괄 패치 (Security)
+
+`npm audit` High 4건(@xmldom/xmldom 5건의 XML injection + DoS, @hono/node-server 경로 우회, express-rate-limit IPv6 우회, fast-uri path traversal) 일괄 패치. 모두 semver-major 변경 없는 patch/minor 업데이트. `npm audit` → **0 vulnerabilities**. 코드 변경 0건. 자세한 GHSA 목록은 [CHANGELOG](CHANGELOG.md#405---2026-05-23) 참조.
+
 ### + v4.0.4 — 약어 부분 매칭
 
 기존 약어 처리는 query 전체가 등록 약어와 정확 일치할 때만 동작 ("화관법" → "화학물질관리법"). v4.0.4는 약어가 다른 토큰과 **결합된** query도 풀네임 변형으로 자동 확장.
@@ -598,6 +602,41 @@ korean-law help search_law                 # 도구별 도움말
 | HTTP 헤더 | `apikey: 내키` | 프로그래밍으로 연동할 때 |
 | 환경변수 | `LAW_OC=내키` | 로컬 설치(방법 3, 4) |
 | 도구 파라미터 | `apiKey: "내키"` | 특정 요청만 다른 키 쓸 때 |
+
+### 법제처 API 프로토콜 설정
+
+법제처 API 호출은 기본적으로 HTTPS를 사용합니다. 사내망·폐쇄망 등 인증서 검증이 어려운 환경에서는 `LAW_API_PROTOCOL=http`를 설정해 HTTP로 호출할 수 있습니다.
+
+MCP 클라이언트 설정의 `env` 블록에 함께 넣는 방식이 가장 명확합니다:
+
+```json
+{
+  "mcpServers": {
+    "korean-law": {
+      "command": "korean-law-mcp",
+      "env": {
+        "LAW_OC": "honggildong",
+        "LAW_API_PROTOCOL": "http"
+      }
+    }
+  }
+}
+```
+
+터미널에서 직접 실행하거나 `.env` 파일을 사용할 수도 있습니다:
+
+```bash
+export LAW_API_PROTOCOL=http        # Mac/Linux
+set LAW_API_PROTOCOL=http           # Windows CMD
+$env:LAW_API_PROTOCOL="http"       # Windows PowerShell
+```
+
+```env
+LAW_OC=honggildong
+LAW_API_PROTOCOL=http
+```
+
+허용값은 `http`, `https`입니다. 설정하지 않거나 다른 값을 넣으면 `https`가 사용됩니다.
 
 ---
 
