@@ -49,6 +49,14 @@ graph LR
 
 → STEP 1 상황진단(주택임대차보호법 자동 식별) → STEP 2 권리/구제수단(판례) → STEP 3 신청기관/기한(행정규칙+해석) → STEP 4 필요서류/양식(별표) → STEP 5 함정/주의(시효·법률구조공단). 평소 말투 그대로 → 실행 가능한 단계로 변환.
 
+### + v4.0.7 — 국세청 판례 본문 fallback
+
+법제처 JSON API에 본문이 비어 오는 판례를 국세청 `taxlaw.nts.go.kr`에서 HTML로 자동 보강. JSON 실패·파싱 실패·본문 누락 세 경우 모두 fallback으로 진입하며 안전하게 회수됨. 사내망/SSL inspection 환경용 `LAW_EXTERNAL_HTTPS_PROXY`(선택)·`LAW_EXTERNAL_TLS_REJECT_UNAUTHORIZED`(진단용) 지원 — 자세한 설정은 아래 "국세청 판례 서버 TLS/프록시 설정" 섹션 참조. (외부 PR #44)
+
+### + v4.0.6 — 법제처 API 프로토콜 설정 + 판례 재검색 개선
+
+폐쇄망/인증서 문제 환경을 위해 `LAW_API_PROTOCOL=http` 옵션 추가(기본 https). 판례 재검색 키워드 후보 생성 개선으로 매칭률 향상. (외부 PR #41/#42)
+
 ### + v4.0.5 — 의존성 취약점 일괄 패치 (Security)
 
 `npm audit` High 4건(@xmldom/xmldom 5건의 XML injection + DoS, @hono/node-server 경로 우회, express-rate-limit IPv6 우회, fast-uri path traversal) 일괄 패치. 모두 semver-major 변경 없는 patch/minor 업데이트. `npm audit` → **0 vulnerabilities**. 코드 변경 0건. 자세한 GHSA 목록은 [CHANGELOG](CHANGELOG.md#405---2026-05-23) 참조.
@@ -637,6 +645,42 @@ LAW_API_PROTOCOL=http
 ```
 
 허용값은 `http`, `https`입니다. 설정하지 않거나 다른 값을 넣으면 `https`가 사용됩니다.
+
+### 국세청 판례 서버 TLS/프록시 설정
+
+국세청 출처 판례 본문은 법제처 JSON 응답만으로 제공되지 않는 경우가 있어, 내부적으로 `taxlaw.nts.go.kr`의 국세청 판례 서버를 추가 조회합니다. 이 서버는 HTTP로 접근해도 HTTPS로 리다이렉트되므로, `LAW_API_PROTOCOL=http` 설정과 별개로 Node.js 런타임이 `https://taxlaw.nts.go.kr` 인증서를 신뢰해야 합니다.
+
+사내망, 폐쇄망, 방화벽, SSL inspection 프록시 뒤에서는 브라우저로는 국세청 판례 페이지가 열리지만 Node.js `fetch()`만 `[EXTERNAL_API_ERROR] fetch failed`로 실패할 수 있습니다. 브라우저와 Node.js가 사용하는 인증서 저장소와 프록시 설정이 다를 수 있기 때문입니다.
+
+운영환경에서 먼저 Node.js 기준으로 HTTPS 연결을 확인하세요:
+
+```bash
+node -e "fetch('https://taxlaw.nts.go.kr/qt/USEQTA002P.do?ntstDcmId=200000000000019303').then(r=>console.log(r.status,r.url)).catch(e=>console.error(e.name,e.message,e.cause))"
+```
+
+운영망에서 직접 연결이 끊기고 별도 웹 프록시를 거쳐야 한다면 실제 프록시 서버 주소를 설정하세요. 현재 이 설정은 국세청 판례 본문 fallback의 외부 HTTPS 연결에 적용됩니다:
+
+```env
+LAW_EXTERNAL_HTTPS_PROXY=http://proxy-host:8080
+```
+
+Windows에서 시스템 환경변수로 등록해야 하는 경우 관리자 권한 터미널에서 설정합니다. 적용 후 Windows 또는 Node.js 프로세스를 재시작하세요:
+
+```cmd
+setx LAW_EXTERNAL_HTTPS_PROXY http://proxy-host:8080 /M
+```
+
+프록시 경로에서도 사내 인증서 검증 문제가 남는 경우, 원인 확인용으로만 이 프로젝트의 외부 HTTPS 프록시 경로에 한해 TLS 인증서 검증을 임시 비활성화할 수 있습니다. 운영 상시 설정으로 사용하지 마세요:
+
+```cmd
+setx LAW_EXTERNAL_TLS_REJECT_UNAUTHORIZED 0 /M
+```
+
+진단 후 제거:
+
+```cmd
+reg delete "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v LAW_EXTERNAL_TLS_REJECT_UNAUTHORIZED /f
+```
 
 ---
 

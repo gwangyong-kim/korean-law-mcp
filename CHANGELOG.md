@@ -1,5 +1,30 @@
 # Changelog
 
+## [4.0.7] - 2026-05-29
+
+### Fixed — 국세청 판례 본문 fallback 안정화 (외부 PR #44)
+
+법제처 JSON API에 본문이 비어 오는 판례(예: 616821)를 국세청 `taxlaw.nts.go.kr`에서 HTML로 보강하는 fallback 추가.
+
+- **3갈래 fallback 진입**: JSON 요청 실패 / JSON 파싱 실패 / 본문 누락(`isMissingPrecedentJson`) 모두 HTML fallback 경로로 진입. 전체가 outer try-catch로 감싸져 fallback이 실패해도 안전하게 에러 반환.
+- **`formatPrecedentText`**: 판례 출력 로직 함수화로 중복 제거.
+- **외부 HTTPS 프록시 지원** (`src/lib/external-https-proxy.ts`): `LAW_EXTERNAL_HTTPS_PROXY`(선택) — 사내망/SSL inspection 환경의 국세청 판례 접근용 CONNECT 프록시. `LAW_EXTERNAL_TLS_REJECT_UNAUTHORIZED=0`(진단/임시용, 운영 금지)로 해당 경로 한정 TLS 검증 우회.
+- **redirect 추적**: `resolveTaxlawDetailUrl`이 상세 URL location 헤더를 최대 3회 추적.
+
+### Refactor
+
+- `isMissingPrecedentJson` 죽은 코드 제거 — `PrecService` early-return 이후 도달 불가능했던 `lawMessage` 분기 정리, 동작 유지하며 `return !obj.PrecService`로 단순화.
+
+## [4.0.6] - 2026-05-23
+
+### Added — 법제처 API 프로토콜 설정 (외부 PR #41)
+
+- **`LAW_API_PROTOCOL`** 환경변수 추가(기본 `https`). 폐쇄망/인증서 문제 환경에서 `http`로 전환 가능.
+
+### Fixed — 판례 재검색 키워드 후보 개선 (외부 PR #42)
+
+- 판례 재검색 시 키워드 후보 생성 로직 개선으로 매칭 정확도 향상.
+
 ## [4.0.5] - 2026-05-23
 
 ### Security — 의존성 취약점 일괄 패치 (High 4건 → 0건)
