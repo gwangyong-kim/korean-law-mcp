@@ -49,6 +49,14 @@ graph LR
 
 → STEP 1 상황진단(주택임대차보호법 자동 식별) → STEP 2 권리/구제수단(판례) → STEP 3 신청기관/기한(행정규칙+해석) → STEP 4 필요서류/양식(별표) → STEP 5 함정/주의(시효·법률구조공단). 평소 말투 그대로 → 실행 가능한 단계로 변환.
 
+### + v4.1.0 — 판례 검색 구조화 + 상세 증거 자동 연결
+
+판례 검색을 공통 구조화 core(`searchPrecedentsStructured`)로 통합. 긴 자연어/개념형 질의를 compact query로 보정하고, 사건번호→제목→본문검색 순으로 폴백. 상위 판례를 `get_precedent_text`에 자동 연결(기본 2건/최대 5건)해 근거 본문을 함께 제공하며, `search_decisions(domain="precedent", options.includeText=true)`로 opt-in. 다건 상세조회 합산 시 뒷 판례가 잘리던 문제도 건당 본문 예산 배분으로 해결. (외부 PR #46 + 후속 최적화)
+
+### + v4.0.9 — 법제처 API `Referer` 헤더 자동 주입
+
+법제처 OPEN API가 **`Referer` 헤더 없는 요청을 OC 키 유효 여부와 무관하게 거부**("사용자 정보 검증 실패")하는 문제 대응. `law.go.kr` 계열 호스트 호출 시 기본 `Referer`를 자동 주입한다(`LAW_REFERER`로 override). IP/도메인 등록 문제로 오인되기 쉬운 증상의 실제 근본 원인이었음 — IP 등록을 했는데도 모든 검색이 실패하던 케이스를 해결. (외부 PR #45)
+
 ### + v4.0.8 — 법제처 빈/HTML 응답 자동 재시도
 
 법제처 OPEN API가 간헐적으로 200 상태에 **빈 본문이나 HTML 점검 페이지**를 반환하던 문제 대응. 이 경우 XML 파서가 `missing root element`로 터지며 "됐다 안 됐다" 증상이 발생했음. `fetchWithRetry`가 빈/HTML 응답을 일시 장애로 간주해 자동 재시도(exponential backoff)하고, 재시도 소진 후에도 빈 응답이면 `search_law`가 `missing root element` 대신 명확한 안내 메시지를 반환하도록 수정. (IP 등록·OC 키와 무관한 외부 응답 불안정 이슈)

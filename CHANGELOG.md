@@ -1,5 +1,45 @@
 # Changelog
 
+## [4.1.0] - 2026-05-31
+
+### Added — 판례 검색 구조화 + 상세 증거 자동 연결 (외부 PR #46)
+
+판례 검색을 공통 구조화 core로 모으고, 긴 자연어/개념형 질의의 누락을 줄이며, 검색→본문조회 연결을 안정화.
+
+- **`precedent-search-core.ts`** `searchPrecedentsStructured()`: 공통 판례 검색 진입점. `hits`/`attempts`/`fallbackUsed`/`successfulAttempt` 구조화. 사건번호 우선 → 제목 검색 → 본문검색(`search=2`) 폴백. compact query로 긴 질의 보정. 날짜 필터 시 표시 hit·`totalCount` 정합성 처리, `date_relaxed` 폴백.
+- **`precedent-evidence.ts`** `fetchPrecedentEvidence()`: 상위 hit를 `get_precedent_text`에 연결(기본 2건/최대 5건). 부분 실패는 숨기지 않고 렌더링. `validatePrecedentSearchResult()`로 폴백 결과 질의 축 검증.
+- **`compact-query-planner.ts`** 확장: 법리축+사실축 후보 생성, 출처/점수/variant/검증 메타데이터 보존.
+- **`search_decisions(domain="precedent", options.includeText=true)`** + `options.detailLimit` 추가(기본 동작 유지, opt-in).
+- 체인 도구(`chain_full_research`/`chain_dispute_prep`/`chain_document_review`) 판례 경로를 공통 core로 정리.
+- 조문 기반 도구(`article-with-precedents`/`impact-map`)는 `fallbackPolicy: "none"`으로 정확 검색 유지.
+- `docs/PRECEDENT-SEARCH-GUIDELINES.md` 추가.
+
+기존 `[id] 제목` 렌더링·bracketed ID 추출 흐름 유지, 신규 노출 도구 없음.
+
+### Fixed — 상세조회 다건 합산 시 뒷 판례 통째 잘림 (코드 리뷰 후속)
+
+`search_decisions(includeText=true)`가 상세조회 2건을 이어붙인 뒤 `truncateResponse`(50KB)를 한 번만 적용해, 합산이 한도를 넘으면 두 번째 판례가 통째로 잘리던 문제. `fetchPrecedentEvidence`가 성공 항목 본문에 건당 예산(`MAX_RESPONSE_SIZE` 균등 배분)을 미리 적용하도록 수정 → 모든 판례가 균형 있게 보존.
+
+### Changed
+
+- `kordoc` 1.6.1 → 2.4.0 (별표 통합 파서 의존성 업데이트).
+
+### 검증
+- `npm run build` + 판례 검색 관련 비-live 회귀 테스트 + `test-precedent-evidence-budget.cjs`(건당 예산 배분) + v4.0.8/4.0.9 회귀 테스트 통과.
+
+## [4.0.9] - 2026-05-31
+
+### Fixed — 법제처 API `Referer` 헤더 누락으로 인한 "사용자 정보 검증 실패" / 전 검색 실패 (외부 PR #45)
+
+법제처 OPEN API는 요청에 **`Referer` 헤더가 없으면 OC 키가 유효해도** "사용자 정보 검증에 실패하였습니다(정확한 서버장비의 IP주소 및 도메인주소를 등록해 주세요)" XML을 반환한다(헤더 격리 테스트로 입증, 동일 키·동일 IP 기준 Referer 유무만으로 갈림). 메시지가 IP 화이트리스트 문제로 오인되기 쉬우나 **실제 원인은 Referer 누락**.
+
+- v4.0.8의 빈/HTML 재시도는 증상(`missing root element`)을 완화했을 뿐, 근본 원인은 이 Referer 누락이었음. fly 서버에서 재현 확인: Referer 없으면 `ECONNRESET`/검증실패, `Referer: https://www.law.go.kr/` 추가 시 정상 응답. 법제처가 최근(2026-05) 이 검증을 강화한 것으로 보임.
+- **`fetch-with-retry.ts`**: 요청 호스트가 `law.go.kr` 계열일 때만 기본 `Referer` 주입(`isLawGoKrHost`). 호출자가 이미 지정했거나 다른 호스트(국세청 `taxlaw.nts.go.kr` 등)는 미주입. `LAW_REFERER` 환경변수로 override 가능.
+
+### 검증
+- `test/test-law-go-kr-referer.cjs`: 호스트 판별·기본 주입·호출자 보존·override·서브도메인 통과.
+- `npm run build` + v4.0.8 빈/HTML 재시도 회귀 테스트 통과.
+
 ## [4.0.8] - 2026-05-29
 
 ### Fixed — 법제처 빈/HTML 응답으로 인한 `missing root element` 간헐 실패
